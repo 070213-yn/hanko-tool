@@ -40,6 +40,8 @@
     });
 
     document.getElementById('btn-download-all').addEventListener('click', _downloadAllAsZip);
+
+    document.getElementById('btn-place-to-editor').addEventListener('click', _placeToEditor);
   });
 
   function _handleFiles(fileList) {
@@ -481,6 +483,30 @@
       toolbar.style.display = 'none';
       dropZone.style.display = '';
       dlBtn.disabled = true;
+    }
+  }
+
+  // === 入稿シートに配置 ===
+
+  function _placeToEditor() {
+    if (images.length === 0) {
+      alert('配置する画像がありません。先に画像を二値化してください。');
+      return;
+    }
+
+    // 全画像のpreviewCanvasをdataURLに変換
+    const items = images.map(img => ({
+      name: _makeFileName(img.fileName),
+      dataURL: img.previewCanvas.toDataURL('image/png'),
+    }));
+
+    try {
+      const json = JSON.stringify(items);
+      sessionStorage.setItem('hankodori_binarized_images', json);
+      window.location.href = 'index.html';
+    } catch (e) {
+      console.error('sessionStorage保存エラー:', e);
+      alert('画像データの転送に失敗しました。画像サイズが大きすぎる可能性があります。');
     }
   }
 

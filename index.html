@@ -113,6 +113,27 @@
             </div>
           </div>
 
+          <!-- 画像を配置 -->
+          <div class="sidebar-section">
+            <div class="section-label">
+              <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                <path fill-rule="evenodd" d="M1 5.25A2.25 2.25 0 013.25 3h13.5A2.25 2.25 0 0119 5.25v9.5A2.25 2.25 0 0116.75 17H3.25A2.25 2.25 0 011 14.75v-9.5zm1.5 5.81v3.69c0 .414.336.75.75.75h13.5a.75.75 0 00.75-.75v-2.69l-2.22-2.219a.75.75 0 00-1.06 0l-1.91 1.909-3.22-3.22a.75.75 0 00-1.06 0L3.5 11.06zM10 5.5a2 2 0 11-4 0 2 2 0 014 0z" clip-rule="evenodd"/>
+              </svg>
+              画像を配置
+              <span id="placer-count" class="text-[10px] text-gray-400 ml-auto"></span>
+            </div>
+            <div class="image-upload-zone" id="image-upload-zone">
+              <input type="file" id="placer-file-input" accept="image/*" multiple class="hidden">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+              <span>画像をアップロード</span>
+            </div>
+            <div id="placer-image-list"></div>
+            <div class="placement-hint" id="placement-hint">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd"/></svg>
+              <span>枠をクリックして画像を配置</span>
+            </div>
+          </div>
+
           <!-- 整列ツール -->
           <div class="sidebar-section">
             <div class="section-label">
@@ -254,6 +275,19 @@
           <button class="maker-tab" data-maker="yamada">ヤマダ</button>
         </div>
         <div id="mobile-stamp-list" class="mb-3"></div>
+        <!-- モバイル: 画像配置 -->
+        <div class="mb-3">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="text-xs font-semibold text-gray-500">画像を配置</span>
+            <span id="mobile-placer-count" class="text-[10px] text-gray-400"></span>
+            <button id="mobile-image-upload-btn" class="ml-auto text-xs font-semibold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md">画像追加</button>
+          </div>
+          <div id="mobile-placer-image-list"></div>
+          <div class="placement-hint" id="mobile-placement-hint">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd"/></svg>
+            <span>枠をクリックして配置</span>
+          </div>
+        </div>
         <div class="flex items-center gap-1.5 mb-3 flex-wrap">
           <button class="align-btn-sm" data-align="left" title="左揃え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="4" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="7" y="14" width="6" height="4" rx="1"/></svg></button>
           <button class="align-btn-sm" data-align="right" title="右揃え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="4" x2="20" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="11" y="14" width="6" height="4" rx="1"/></svg></button>
@@ -289,6 +323,7 @@
   <script src="js/frame-factory.js"></script>
   <script src="js/snap-align.js"></script>
   <script src="js/exporter.js"></script>
+  <script src="js/image-placer.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

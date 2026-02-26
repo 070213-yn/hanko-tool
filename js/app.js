@@ -7,6 +7,7 @@
   let frameFactory;
   let snapAlign;
   let exporter;
+  let imagePlacer;
   let currentMaker = 'karafuruya';
 
   // 初期化 - window.onloadでレイアウト完了後に実行
@@ -15,6 +16,10 @@
     frameFactory = new FrameFactory(canvasManager);
     snapAlign = new SnapAlign(canvasManager);
     exporter = new Exporter(canvasManager);
+    imagePlacer = new ImagePlacer(canvasManager);
+
+    // グローバル公開（frame-factory等から参照）
+    window.imagePlacer = imagePlacer;
 
     _setupMakerTabs();
     _renderStampList(currentMaker);
@@ -25,6 +30,7 @@
     _setupMobilePanel();
     _setupKeyboard();
     _setupHint();
+    _setupImagePlacer();
   });
 
   // === 使い方ヒント ===
@@ -343,12 +349,55 @@
         frameFactory.rotateSelected();
       }
 
-      // Escape: 選択解除
+      // Escape: 選択解除 + 画像配置モード解除
       if (e.key === 'Escape') {
         canvasManager.getCanvas().discardActiveObject();
         canvasManager.getCanvas().requestRenderAll();
+        if (imagePlacer && imagePlacer.selectedId) {
+          imagePlacer.deselect();
+        }
       }
     });
+  }
+
+  // === 画像配置セットアップ ===
+  function _setupImagePlacer() {
+    // PC用: アップロードゾーンクリック → ファイル入力
+    const uploadZone = document.getElementById('image-upload-zone');
+    const fileInput = document.getElementById('placer-file-input');
+    if (uploadZone && fileInput) {
+      uploadZone.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', () => {
+        imagePlacer.importFiles(fileInput.files);
+        fileInput.value = '';
+      });
+    }
+
+    // モバイル用: 画像追加ボタン
+    const mobileUploadBtn = document.getElementById('mobile-image-upload-btn');
+    if (mobileUploadBtn && fileInput) {
+      mobileUploadBtn.addEventListener('click', () => fileInput.click());
+    }
+
+    // キャンバスクリック: 配置モード中なら枠に画像を配置
+    const canvas = canvasManager.getCanvas();
+    canvas.on('mouse:down', (opt) => {
+      if (!imagePlacer.selectedId) return;
+
+      const target = opt.target;
+      if (target && target.isStampFrame) {
+        const placed = imagePlacer.placeInFrame(target);
+        if (placed) {
+          // 配置成功
+          canvas.discardActiveObject();
+          canvas.requestRenderAll();
+        }
+      }
+    });
+
+    // sessionStorageからの転送データをチェック
+    imagePlacer.checkSessionStorage();
+    imagePlacer.renderList();
   }
 
 })();

@@ -193,6 +193,12 @@ class FrameFactory {
       const oldTop = frame.top;
       const cat = frame._category;
 
+      // 配置済み画像情報を保存
+      let placementInfo = null;
+      if (window.imagePlacer) {
+        placementInfo = window.imagePlacer.getPlacementInfo(frame);
+      }
+
       // 幅と高さを入れ替えた新しいスタンプ定義
       const swappedStamp = {
         id: frame.stampId,
@@ -205,6 +211,12 @@ class FrameFactory {
 
       // 同じ位置に縦横入替えた新しい枠を作成
       const newFrame = this.createFrame(swappedStamp, cat, { left: oldLeft, top: oldTop });
+
+      // 画像を再配置
+      if (window.imagePlacer && placementInfo) {
+        window.imagePlacer.restorePlacement(newFrame, placementInfo);
+      }
+
       newFrames.push(newFrame);
     });
 
@@ -227,6 +239,10 @@ class FrameFactory {
 
     activeObjects.forEach(obj => {
       if (obj.isStampFrame) {
+        // 配置済み画像のクリーンアップ
+        if (window.imagePlacer) {
+          window.imagePlacer.onFrameRemoved(obj);
+        }
         canvas.remove(obj);
       }
     });
@@ -239,7 +255,13 @@ class FrameFactory {
   deleteAll() {
     const canvas = this.cm.getCanvas();
     const frames = this.cm.getStampFrames();
-    frames.forEach(f => canvas.remove(f));
+    frames.forEach(f => {
+      // 配置済み画像のクリーンアップ
+      if (window.imagePlacer) {
+        window.imagePlacer.onFrameRemoved(f);
+      }
+      canvas.remove(f);
+    });
     canvas.discardActiveObject();
     canvas.requestRenderAll();
 
