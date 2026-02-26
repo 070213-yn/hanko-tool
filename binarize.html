@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>はんこどり - 画像二値化ツール</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .drop-zone {
+      border: 3px dashed #d1d5db;
+      border-radius: 12px;
+      padding: 60px 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: #2563eb;
+      background: #eff6ff;
+    }
+    .preview-canvas-wrap {
+      max-width: 100%;
+      overflow: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: repeating-conic-gradient(#f3f4f6 0% 25%, #fff 0% 50%) 50% / 20px 20px;
+    }
+    .preview-canvas-wrap canvas {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="max-w-4xl mx-auto px-4 py-6">
+    <!-- ヘッダー -->
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-xl font-bold text-gray-800">画像二値化ツール</h1>
+      <a href="index.html" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+        入稿ツールに戻る
+      </a>
+    </div>
+
+    <!-- ドロップゾーン -->
+    <div id="drop-zone" class="drop-zone mb-6">
+      <input type="file" id="file-input" accept="image/*" class="hidden">
+      <p class="text-gray-500 text-lg mb-2">画像をドラッグ&ドロップ</p>
+      <p class="text-gray-400 text-sm">またはクリックしてファイルを選択</p>
+      <p class="text-gray-400 text-xs mt-2">PNG, JPG, BMP 対応</p>
+    </div>
+
+    <!-- プレビューエリア -->
+    <div id="preview-area" class="hidden gap-4 mb-6" style="display: none;">
+      <div class="flex-1">
+        <div class="text-sm font-semibold text-gray-600 mb-2">元画像</div>
+        <div class="preview-canvas-wrap">
+          <canvas id="original-canvas"></canvas>
+        </div>
+      </div>
+      <div class="flex-1">
+        <div class="text-sm font-semibold text-gray-600 mb-2">二値化後（白=透明）</div>
+        <div class="preview-canvas-wrap">
+          <canvas id="preview-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- コントロール -->
+    <div id="controls" class="hidden items-center gap-4 bg-white rounded-lg border border-gray-200 p-4" style="display: none;">
+      <div class="flex items-center gap-3 flex-1">
+        <label class="text-sm font-medium text-gray-700 whitespace-nowrap">しきい値:</label>
+        <input type="range" id="threshold-slider" min="0" max="255" value="128"
+               class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+        <span id="threshold-value" class="text-sm font-mono text-gray-600 w-8 text-right">128</span>
+      </div>
+      <button id="btn-auto-threshold"
+              class="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50">
+        自動
+      </button>
+      <button id="btn-download"
+              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+        PNGダウンロード
+      </button>
+    </div>
+
+    <!-- 新しい画像を読み込む -->
+    <div id="reload-area" class="hidden mt-4 text-center" style="display: none;">
+      <button id="btn-reload" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+        別の画像を読み込む
+      </button>
+    </div>
+  </div>
+
+  <script src="js/binarize.js"></script>
+  <script>
+    // 別画像読み込みボタン
+    document.addEventListener('DOMContentLoaded', () => {
+      const reloadArea = document.getElementById('reload-area');
+      const btnReload = document.getElementById('btn-reload');
+      const fileInput = document.getElementById('file-input');
+      const dropZone = document.getElementById('drop-zone');
+      const previewArea = document.getElementById('preview-area');
+      const controls = document.getElementById('controls');
+
+      // プレビュー表示時にリロードボタンも表示
+      const observer = new MutationObserver(() => {
+        if (previewArea.style.display !== 'none') {
+          reloadArea.style.display = 'block';
+        }
+      });
+      observer.observe(previewArea, { attributes: true, attributeFilter: ['style'] });
+
+      btnReload.addEventListener('click', () => {
+        dropZone.style.display = '';
+        previewArea.style.display = 'none';
+        controls.style.display = 'none';
+        reloadArea.style.display = 'none';
+        fileInput.value = '';
+      });
+    });
+  </script>
+</body>
+</html>

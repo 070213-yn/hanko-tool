@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>はんこどり - 入稿データ作成ツール</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Fabric.js v5 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+
+  <!-- カスタムCSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-gray-100">
+  <div id="app">
+    <!-- ヘッダー -->
+    <header id="header" class="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+      <h1 class="text-lg font-bold text-gray-800">はんこどり 入稿データ作成</h1>
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-1 text-sm text-gray-600 cursor-pointer">
+          <input type="checkbox" id="grid-toggle" checked class="rounded">
+          <span>グリッド</span>
+        </label>
+        <a href="binarize.html" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+          二値化ツール
+        </a>
+      </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <div id="main-content">
+      <!-- PC用サイドバー -->
+      <aside id="sidebar" class="p-4">
+        <!-- メーカータブ -->
+        <div class="flex border-b border-gray-200 mb-4">
+          <button class="maker-tab active" data-maker="karafuruya">からふるや</button>
+          <button class="maker-tab" data-maker="yamada">ヤマダ</button>
+        </div>
+
+        <!-- スタンプ一覧 -->
+        <div id="stamp-list" class="mb-6">
+          <!-- JSで動的生成 -->
+        </div>
+
+        <!-- 整列ツール -->
+        <div class="mb-4">
+          <div class="section-title">整列ツール</div>
+          <div class="grid grid-cols-4 gap-1.5 mb-2">
+            <!-- 左揃え -->
+            <button class="align-btn" data-align="left" title="左揃え">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="4" x2="4" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="7" y="14" width="6" height="4" rx="1"/>
+              </svg>
+            </button>
+            <!-- 右揃え -->
+            <button class="align-btn" data-align="right" title="右揃え">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="20" y1="4" x2="20" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="11" y="14" width="6" height="4" rx="1"/>
+              </svg>
+            </button>
+            <!-- 上揃え -->
+            <button class="align-btn" data-align="top" title="上揃え">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="4" x2="20" y2="4"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="7" width="4" height="6" rx="1"/>
+              </svg>
+            </button>
+            <!-- 下揃え -->
+            <button class="align-btn" data-align="bottom" title="下揃え">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="20" x2="20" y2="20"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="11" width="4" height="6" rx="1"/>
+              </svg>
+            </button>
+            <!-- 水平中央揃え -->
+            <button class="align-btn" data-align="centerH" title="水平中央揃え">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="2 2"/><rect x="5" y="6" width="14" height="4" rx="1"/><rect x="7" y="14" width="10" height="4" rx="1"/>
+              </svg>
+            </button>
+            <!-- 垂直中央揃え -->
+            <button class="align-btn" data-align="centerV" title="垂直中央揃え">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="2" y1="12" x2="22" y2="12" stroke-dasharray="2 2"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="7" width="4" height="10" rx="1"/>
+              </svg>
+            </button>
+            <!-- 水平均等分布 -->
+            <button class="align-btn" data-align="distributeH" title="水平均等分布">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="4" x2="4" y2="20"/><line x1="20" y1="4" x2="20" y2="20"/><rect x="8" y="8" width="3" height="8" rx="1"/><rect x="13" y="8" width="3" height="8" rx="1"/>
+              </svg>
+            </button>
+            <!-- 垂直均等分布 -->
+            <button class="align-btn" data-align="distributeV" title="垂直均等分布">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="4" x2="20" y2="4"/><line x1="4" y1="20" x2="20" y2="20"/><rect x="8" y="8" width="8" height="3" rx="1"/><rect x="8" y="13" width="8" height="3" rx="1"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- アクションボタン -->
+        <div class="space-y-2">
+          <button id="btn-delete-selected" class="action-btn danger" disabled>
+            選択を削除
+          </button>
+          <button id="btn-delete-all" class="action-btn danger">
+            全削除
+          </button>
+          <button id="btn-export-png" class="action-btn primary">
+            PNG書出し (1200DPI)
+          </button>
+          <button id="btn-export-svg" class="action-btn">
+            SVG書出し
+          </button>
+        </div>
+
+        <!-- 配置数 -->
+        <div class="mt-4 text-xs text-gray-500" id="frame-count">
+          配置数: 0
+        </div>
+      </aside>
+
+      <!-- キャンバスエリア -->
+      <div id="canvas-area">
+        <div id="canvas-container">
+          <canvas id="main-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ズームバー -->
+    <div id="zoom-bar" class="px-4 py-2 flex items-center gap-3">
+      <button id="zoom-out" class="text-gray-500 hover:text-gray-700 font-bold text-lg leading-none px-1">-</button>
+      <input type="range" id="zoom-slider" min="10" max="500" value="100" class="flex-1">
+      <button id="zoom-in" class="text-gray-500 hover:text-gray-700 font-bold text-lg leading-none px-1">+</button>
+      <span id="zoom-label" class="text-sm text-gray-600 w-12 text-right">100%</span>
+      <button id="zoom-fit" class="text-xs text-blue-600 hover:text-blue-800 ml-2">フィット</button>
+    </div>
+
+    <!-- モバイル用下部パネル -->
+    <div id="mobile-panel" class="collapsed">
+      <div id="mobile-panel-handle"></div>
+      <div id="mobile-panel-content">
+        <!-- メーカータブ -->
+        <div class="flex border-b border-gray-200 mb-3">
+          <button class="maker-tab active" data-maker="karafuruya">からふるや</button>
+          <button class="maker-tab" data-maker="yamada">ヤマダ</button>
+        </div>
+        <!-- スタンプ一覧（横スクロール） -->
+        <div id="mobile-stamp-list" class="mb-3"></div>
+        <!-- 整列・操作 -->
+        <div class="flex items-center gap-2 mb-3 flex-wrap">
+          <button class="align-btn" data-align="left" title="左揃え">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="4" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="7" y="14" width="6" height="4" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="right" title="右揃え">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="4" x2="20" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="11" y="14" width="6" height="4" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="top" title="上揃え">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="4"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="7" width="4" height="6" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="bottom" title="下揃え">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="20"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="11" width="4" height="6" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="centerH" title="水平中央揃え">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="2 2"/><rect x="5" y="6" width="14" height="4" rx="1"/><rect x="7" y="14" width="10" height="4" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="centerV" title="垂直中央揃え">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="12" x2="22" y2="12" stroke-dasharray="2 2"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="7" width="4" height="10" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="distributeH" title="水平均等分布">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="4" y2="20"/><line x1="20" y1="4" x2="20" y2="20"/><rect x="8" y="8" width="3" height="8" rx="1"/><rect x="13" y="8" width="3" height="8" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="distributeV" title="垂直均等分布">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="4"/><line x1="4" y1="20" x2="20" y2="20"/><rect x="8" y="8" width="8" height="3" rx="1"/><rect x="8" y="13" width="8" height="3" rx="1"/></svg>
+          </button>
+        </div>
+        <div class="flex gap-2">
+          <button id="mobile-btn-delete" class="action-btn danger flex-1" disabled>削除</button>
+          <button id="mobile-btn-clear" class="action-btn danger flex-1">全削除</button>
+          <button id="mobile-btn-export" class="action-btn primary flex-1">PNG書出し</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ローディングオーバーレイ -->
+    <div id="loading-overlay">
+      <div class="text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p class="text-gray-600" id="loading-text">エクスポート中...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script src="js/frame-data.js"></script>
+  <script src="js/canvas-manager.js"></script>
+  <script src="js/frame-factory.js"></script>
+  <script src="js/snap-align.js"></script>
+  <script src="js/exporter.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
