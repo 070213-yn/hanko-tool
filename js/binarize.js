@@ -34,7 +34,7 @@
     document.getElementById('btn-auto-all').addEventListener('click', () => {
       images.forEach(img => {
         img.threshold = _otsuThreshold(img.originalImageData);
-        _applyBinarize(img);
+        _applyAll(img);
         _updateSliderUI(img);
       });
     });
@@ -81,6 +81,7 @@
         };
 
         _applyBinarize(imageObj);
+        if (imageObj.noiseSize > 1) _removeNoise(imageObj);
         images.push(imageObj);
         _renderCard(imageObj);
         _updateToolbar();
@@ -142,8 +143,7 @@
           <label class="text-xs font-medium text-gray-500 whitespace-nowrap">ノイズ除去:</label>
           <input type="range" id="noise-${imageObj.id}" min="1" max="200" value="${imageObj.noiseSize}"
                  class="w-20 cursor-pointer noise-slider">
-          <span id="noise-val-${imageObj.id}" class="text-xs font-mono text-gray-500 w-7 text-right">${imageObj.noiseSize}px</span>
-          <button class="btn-sm btn-noise" data-action="denoise" data-id="${imageObj.id}">適用</button>
+          <span id="noise-val-${imageObj.id}" class="text-xs font-mono text-gray-500 w-10 text-right">${imageObj.noiseSize}px</span>
         </div>
         <div class="controls-divider"></div>
         <button class="btn-sm btn-dl" data-action="download" data-id="${imageObj.id}">
@@ -159,19 +159,20 @@
     document.getElementById(`orig-wrap-${imageObj.id}`).appendChild(imageObj.originalCanvas);
     document.getElementById(`prev-wrap-${imageObj.id}`).appendChild(imageObj.previewCanvas);
 
-    // しきい値スライダー
+    // しきい値スライダー → 二値化+ノイズ除去を同時適用
     const slider = document.getElementById(`slider-${imageObj.id}`);
     slider.addEventListener('input', () => {
       imageObj.threshold = parseInt(slider.value);
       document.getElementById(`val-${imageObj.id}`).textContent = imageObj.threshold;
-      _applyBinarize(imageObj);
+      _applyAll(imageObj);
     });
 
-    // ノイズ除去サイズスライダー
+    // ノイズ除去スライダー → リアルタイムで反映
     const noiseSlider = document.getElementById(`noise-${imageObj.id}`);
     noiseSlider.addEventListener('input', () => {
       imageObj.noiseSize = parseInt(noiseSlider.value);
       document.getElementById(`noise-val-${imageObj.id}`).textContent = imageObj.noiseSize + 'px';
+      _applyAll(imageObj);
     });
 
     // 消しゴムサイズスライダー
@@ -195,7 +196,7 @@
         const img = images.find(i => i.id === id);
         if (img) {
           img.threshold = _otsuThreshold(img.originalImageData);
-          _applyBinarize(img);
+          _applyAll(img);
           _updateSliderUI(img);
         }
       } else if (action === 'download') {
@@ -203,9 +204,6 @@
         if (img) _downloadSingle(img);
       } else if (action === 'remove') {
         _removeImage(id);
-      } else if (action === 'denoise') {
-        const img = images.find(i => i.id === id);
-        if (img) _removeNoise(img);
       } else if (action === 'toggle-eraser') {
         const img = images.find(i => i.id === id);
         if (img) _toggleEraser(img);
@@ -371,14 +369,15 @@
 
     ctx.putImageData(imgData, 0, 0);
 
-    // フィードバック
+    // 除去した成分数を表示
     const removedComponents = componentSizes.filter((s, i) => i > 0 && s < minSize).length;
     const statusEl = document.getElementById(`noise-val-${imageObj.id}`);
     if (statusEl) {
-      statusEl.textContent = `${removedComponents}個除去`;
-      setTimeout(() => {
+      if (removedComponents > 0) {
+        statusEl.textContent = `${imageObj.noiseSize}px (${removedComponents}個除去)`;
+      } else {
         statusEl.textContent = imageObj.noiseSize + 'px';
-      }, 2000);
+      }
     }
   }
 
@@ -479,6 +478,27 @@
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  // === 二値化 + ノイズ除去をまとめて実行（デバウンス付き） ===
+
+  function _applyAll(imageObj) {
+    // 前回のタイマーがあればキャンセル（スライダー操作中の連続呼び出しを間引く）
+    if (imageObj._denoiseTimer) {
+      clearTimeout(imageObj._denoiseTimer);
+      imageObj._denoiseTimer = null;
+    }
+
+    // まず二値化を即座に反映（軽い処理なので）
+    _applyBinarize(imageObj);
+
+    // ノイズ除去はBFS処理が重いのでデバウンス（80ms待って実行）
+    if (imageObj.noiseSize > 1) {
+      imageObj._denoiseTimer = setTimeout(() => {
+        _removeNoise(imageObj);
+        imageObj._denoiseTimer = null;
+      }, 80);
+    }
   }
 
   // === 二値化処理 ===
