@@ -161,7 +161,14 @@ class FrameFactory {
   _updateFrameCount() {
     const count = this.cm.getStampFrames().length;
     const el = document.getElementById('frame-count');
-    if (el) el.textContent = `配置数: ${count}`;
+    if (el) {
+      const numEl = el.querySelector('.frame-counter-num');
+      if (numEl) {
+        numEl.textContent = count;
+      } else {
+        el.textContent = `配置数: ${count}`;
+      }
+    }
   }
 
   // 選択中のオブジェクトを削除

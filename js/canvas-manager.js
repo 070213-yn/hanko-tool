@@ -15,7 +15,7 @@ class CanvasManager {
     this.snapGrid = 1;    // 1mmスナップ
 
     // Fabric.jsがキャンバスをラップする前にコンテナを記録
-    this.containerEl = this.containerEl;
+    this.containerEl = this.canvasEl.parentElement;
 
     this._init();
   }
@@ -41,14 +41,19 @@ class CanvasManager {
 
   // コンテナに合わせてキャンバスサイズを設定
   _fitToContainer() {
-    const container = this.containerEl;
-    const containerW = container.clientWidth;
-    const containerH = container.clientHeight;
+    const containerW = this.containerEl.clientWidth;
+    const containerH = this.containerEl.clientHeight;
+
+    // コンテナサイズが0の場合はフォールバック
+    if (containerW === 0 || containerH === 0) {
+      setTimeout(() => this._fitToContainer(), 50);
+      return;
+    }
 
     // A4のアスペクト比を維持してフィット
     const scaleX = containerW / FRAME_DATA.A4_WIDTH;
     const scaleY = containerH / FRAME_DATA.A4_HEIGHT;
-    this.zoom = Math.min(scaleX, scaleY) * 0.9; // 90%でマージン確保
+    this.zoom = Math.min(scaleX, scaleY) * 0.9;
 
     this.canvas.setDimensions({
       width: containerW,
@@ -72,15 +77,31 @@ class CanvasManager {
       width: FRAME_DATA.A4_WIDTH,
       height: FRAME_DATA.A4_HEIGHT,
       fill: '#FFFFFF',
-      stroke: '#333333',
-      strokeWidth: 0.5,
+      stroke: '#cbd5e1',
+      strokeWidth: 0.3,
       selectable: false,
       evented: false,
       excludeFromExport: false,
       isA4Border: true,
     });
+
+    // A4枠にドロップシャドウ風の効果
+    const shadow = new fabric.Rect({
+      left: 1,
+      top: 1,
+      width: FRAME_DATA.A4_WIDTH,
+      height: FRAME_DATA.A4_HEIGHT,
+      fill: 'rgba(0,0,0,0.06)',
+      selectable: false,
+      evented: false,
+      excludeFromExport: true,
+      isA4Shadow: true,
+    });
+
+    this.canvas.add(shadow);
     this.canvas.add(border);
     this.canvas.sendToBack(border);
+    this.canvas.sendToBack(shadow);
   }
 
   // グリッド描画
@@ -92,11 +113,10 @@ class CanvasManager {
     const h = FRAME_DATA.A4_HEIGHT;
     const spacing = this.gridSpacing;
 
-    // 縦線
     for (let x = spacing; x < w; x += spacing) {
       const line = new fabric.Line([x, 0, x, h], {
-        stroke: '#E0E0E0',
-        strokeWidth: 0.2,
+        stroke: '#e2e8f0',
+        strokeWidth: 0.15,
         selectable: false,
         evented: false,
         excludeFromExport: true,
@@ -106,11 +126,10 @@ class CanvasManager {
       this.canvas.add(line);
     }
 
-    // 横線
     for (let y = spacing; y < h; y += spacing) {
       const line = new fabric.Line([0, y, w, y], {
-        stroke: '#E0E0E0',
-        strokeWidth: 0.2,
+        stroke: '#e2e8f0',
+        strokeWidth: 0.15,
         selectable: false,
         evented: false,
         excludeFromExport: true,
@@ -120,13 +139,14 @@ class CanvasManager {
       this.canvas.add(line);
     }
 
-    // グリッドを最背面に（A4枠の次）
-    this.gridLines.forEach(line => {
-      this.canvas.sendToBack(line);
-    });
-    // A4枠を最背面に
+    // グリッドを最背面に
+    this.gridLines.forEach(line => this.canvas.sendToBack(line));
+
+    // A4枠とシャドウを最背面に
     const a4Border = this.canvas.getObjects().find(o => o.isA4Border);
+    const a4Shadow = this.canvas.getObjects().find(o => o.isA4Shadow);
     if (a4Border) this.canvas.sendToBack(a4Border);
+    if (a4Shadow) this.canvas.sendToBack(a4Shadow);
 
     this.canvas.requestRenderAll();
   }
@@ -208,20 +228,17 @@ class CanvasManager {
         const t1 = e.touches[0];
         const t2 = e.touches[1];
 
-        // ピンチ距離
         const dist = Math.sqrt(
           Math.pow(t2.clientX - t1.clientX, 2) +
           Math.pow(t2.clientY - t1.clientY, 2)
         );
 
-        // 中心点
         const center = {
           x: (t1.clientX + t2.clientX) / 2,
           y: (t1.clientY + t2.clientY) / 2,
         };
 
         if (lastDist > 0) {
-          // ズーム
           const scale = dist / lastDist;
           let newZoom = this.zoom * scale;
           newZoom = Math.max(this.minZoom, Math.min(this.maxZoom, newZoom));
@@ -230,7 +247,6 @@ class CanvasManager {
           this.canvas.zoomToPoint(point, newZoom);
           this.zoom = newZoom;
 
-          // パン
           if (lastCenter) {
             const vpt = this.canvas.viewportTransform;
             vpt[4] += center.x - lastCenter.x;
@@ -246,10 +262,8 @@ class CanvasManager {
       }
     });
 
-    this.canvas.on('touch:drag', (opt) => {
-      // 2本指ドラッグ中は通常のドラッグを無効化
-    });
-
+    // タッチ終了時のリセット
+    const canvasWrapper = this.canvas.wrapperEl || this.containerEl;
     const resetTouch = () => {
       if (touching) {
         lastDist = 0;
@@ -259,8 +273,8 @@ class CanvasManager {
       }
     };
 
-    this.canvasEl.addEventListener('touchend', resetTouch);
-    this.canvasEl.addEventListener('touchcancel', resetTouch);
+    canvasWrapper.addEventListener('touchend', resetTouch);
+    canvasWrapper.addEventListener('touchcancel', resetTouch);
   }
 
   // ウィンドウリサイズ対応
@@ -269,10 +283,9 @@ class CanvasManager {
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        const container = this.containerEl;
         this.canvas.setDimensions({
-          width: container.clientWidth,
-          height: container.clientHeight,
+          width: this.containerEl.clientWidth,
+          height: this.containerEl.clientHeight,
         });
         this.canvas.requestRenderAll();
       }, 100);
@@ -286,9 +299,11 @@ class CanvasManager {
   }
 
   _getBaseZoom() {
-    const container = this.containerEl;
-    const scaleX = container.clientWidth / FRAME_DATA.A4_WIDTH;
-    const scaleY = container.clientHeight / FRAME_DATA.A4_HEIGHT;
+    const containerW = this.containerEl.clientWidth;
+    const containerH = this.containerEl.clientHeight;
+    if (containerW === 0 || containerH === 0) return 1;
+    const scaleX = containerW / FRAME_DATA.A4_WIDTH;
+    const scaleY = containerH / FRAME_DATA.A4_HEIGHT;
     return Math.min(scaleX, scaleY) * 0.9;
   }
 
@@ -298,9 +313,10 @@ class CanvasManager {
     const newZoom = baseZoom * (percent / 100);
     const capped = Math.max(this.minZoom, Math.min(this.maxZoom, newZoom));
 
-    // キャンバス中央を基点にズーム
-    const container = this.containerEl;
-    const center = new fabric.Point(container.clientWidth / 2, container.clientHeight / 2);
+    const center = new fabric.Point(
+      this.containerEl.clientWidth / 2,
+      this.containerEl.clientHeight / 2
+    );
     this.canvas.zoomToPoint(center, capped);
     this.zoom = capped;
 
@@ -319,12 +335,11 @@ class CanvasManager {
     return Math.round(value / this.snapGrid) * this.snapGrid;
   }
 
-  // 全オブジェクトのスタンプ枠を取得（グリッドやA4枠を除く）
+  // 全オブジェクトのスタンプ枠を取得
   getStampFrames() {
     return this.canvas.getObjects().filter(o => o.isStampFrame);
   }
 
-  // キャンバスのFabricインスタンスを返す
   getCanvas() {
     return this.canvas;
   }

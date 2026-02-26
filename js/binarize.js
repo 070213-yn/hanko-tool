@@ -94,8 +94,12 @@
 
         // ドロップゾーンを非表示、プレビューエリアを表示
         document.getElementById('drop-zone').style.display = 'none';
+        // モバイルでは縦並び、PCでは横並び
+        const isMobile = window.innerWidth < 768;
         document.getElementById('preview-area').style.display = 'flex';
+        document.getElementById('preview-area').style.flexDirection = isMobile ? 'column' : 'row';
         document.getElementById('controls').style.display = 'flex';
+        document.getElementById('controls').style.flexWrap = 'wrap';
 
         // 自動しきい値で初期表示
         currentThreshold = _otsuThreshold(originalImageData);

@@ -65,6 +65,15 @@ class Exporter {
     await this._sleep(100);
 
     try {
+      // エクスポートに含めないオブジェクトを一時非表示
+      const hiddenObjects = [];
+      canvas.getObjects().forEach(obj => {
+        if (obj.excludeFromExport || obj.isGrid) {
+          obj.set({ visible: false });
+          hiddenObjects.push(obj);
+        }
+      });
+
       // グリッドを一時非表示
       const gridWasVisible = this.cm.gridVisible;
       if (gridWasVisible) {
@@ -88,11 +97,14 @@ class Exporter {
       // ビューポートを復元
       canvas.viewportTransform = origVpt;
 
+      // 非表示にしたオブジェクトを復元
+      hiddenObjects.forEach(obj => obj.set({ visible: true }));
+
       // グリッドを復元
       if (gridWasVisible) {
         this.cm.gridLines.forEach(l => l.set({ visible: true }));
-        canvas.requestRenderAll();
       }
+      canvas.requestRenderAll();
 
       // ダウンロード
       this._downloadDataURL(dataURL, this._getFileName('png'));
@@ -111,6 +123,15 @@ class Exporter {
   // SVG エクスポート
   exportSVG() {
     const canvas = this.cm.getCanvas();
+
+    // エクスポートに含めないオブジェクトを一時非表示
+    const hiddenObjects = [];
+    canvas.getObjects().forEach(obj => {
+      if (obj.excludeFromExport || obj.isGrid) {
+        obj.set({ visible: false });
+        hiddenObjects.push(obj);
+      }
+    });
 
     // グリッドを一時非表示
     const gridWasVisible = this.cm.gridVisible;
@@ -137,11 +158,14 @@ class Exporter {
     // ビューポートを復元
     canvas.viewportTransform = origVpt;
 
+    // 非表示にしたオブジェクトを復元
+    hiddenObjects.forEach(obj => obj.set({ visible: true }));
+
     // グリッドを復元
     if (gridWasVisible) {
       this.cm.gridLines.forEach(l => l.set({ visible: true }));
-      canvas.requestRenderAll();
     }
+    canvas.requestRenderAll();
 
     const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);

@@ -9,8 +9,8 @@
   let exporter;
   let currentMaker = 'karafuruya';
 
-  // 初期化
-  document.addEventListener('DOMContentLoaded', () => {
+  // 初期化 - window.onloadでレイアウト完了後に実行
+  window.addEventListener('load', () => {
     canvasManager = new CanvasManager('main-canvas');
     frameFactory = new FrameFactory(canvasManager);
     snapAlign = new SnapAlign(canvasManager);
@@ -24,20 +24,34 @@
     _setupSelectionEvents();
     _setupMobilePanel();
     _setupKeyboard();
+    _setupHint();
   });
+
+  // === 使い方ヒント ===
+  function _setupHint() {
+    const hint = document.getElementById('usage-hint');
+    const hideBtn = document.getElementById('hide-hint');
+    if (hint && hideBtn) {
+      hideBtn.addEventListener('click', () => {
+        hint.classList.add('hidden');
+      });
+    }
+  }
 
   // === メーカータブ切り替え ===
   function _setupMakerTabs() {
     document.querySelectorAll('.maker-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         const maker = tab.dataset.maker;
-        if (maker === currentMaker) return;
+        if (!maker || maker === currentMaker) return;
 
         currentMaker = maker;
 
-        // 全タブのアクティブ状態を更新（PC用・モバイル用の両方）
+        // 全タブのアクティブ状態を更新
         document.querySelectorAll('.maker-tab').forEach(t => {
-          t.classList.toggle('active', t.dataset.maker === maker);
+          if (t.dataset.maker) {
+            t.classList.toggle('active', t.dataset.maker === maker);
+          }
         });
 
         _renderStampList(maker);
@@ -52,65 +66,82 @@
 
     // PC用サイドバー
     const pcContainer = document.getElementById('stamp-list');
-    pcContainer.innerHTML = '';
+    if (pcContainer) {
+      pcContainer.innerHTML = '';
 
-    maker.categories.forEach(cat => {
-      // カテゴリヘッダー
-      const header = document.createElement('div');
-      header.className = 'category-header';
-      header.textContent = cat.name;
-      pcContainer.appendChild(header);
+      maker.categories.forEach(cat => {
+        const section = document.createElement('div');
+        section.className = 'stamp-category';
 
-      // スタンプボタン群
-      const grid = document.createElement('div');
-      grid.className = 'flex flex-wrap gap-1.5 mb-4';
+        const nameEl = document.createElement('div');
+        nameEl.className = 'stamp-category-name';
+        nameEl.textContent = cat.name;
+        section.appendChild(nameEl);
 
-      cat.stamps.forEach(stamp => {
-        const btn = document.createElement('button');
-        btn.className = 'stamp-btn';
-        btn.innerHTML = `${stamp.id}<span class="stamp-size">${stamp.width}x${stamp.height}</span>`;
+        const grid = document.createElement('div');
+        grid.className = 'stamp-grid';
 
-        // 外枠色をボーダーに反映
-        btn.style.borderLeftWidth = '3px';
-        btn.style.borderLeftColor = cat.outerStroke;
+        cat.stamps.forEach(stamp => {
+          const btn = document.createElement('button');
+          btn.className = 'stamp-btn';
+          btn.innerHTML = `<span class="stamp-id">${stamp.id}</span><span class="stamp-size">${stamp.width}x${stamp.height}</span>`;
 
-        btn.addEventListener('click', () => {
-          frameFactory.createFrame(stamp, cat);
+          // 外枠色をトップバーに反映
+          btn.style.setProperty('--accent', cat.outerStroke);
+          btn.style.cssText += `border-top: 2px solid ${cat.outerStroke};`;
+
+          btn.addEventListener('click', () => {
+            frameFactory.createFrame(stamp, cat);
+            _updateEmptyMsg();
+            // ヒントを自動的に閉じる
+            const hint = document.getElementById('usage-hint');
+            if (hint) hint.classList.add('hidden');
+          });
+          grid.appendChild(btn);
         });
-        grid.appendChild(btn);
-      });
 
-      pcContainer.appendChild(grid);
-    });
+        section.appendChild(grid);
+        pcContainer.appendChild(section);
+      });
+    }
 
     // モバイル用
     const mobileContainer = document.getElementById('mobile-stamp-list');
-    if (!mobileContainer) return;
-    mobileContainer.innerHTML = '';
+    if (mobileContainer) {
+      mobileContainer.innerHTML = '';
 
-    maker.categories.forEach(cat => {
-      const label = document.createElement('div');
-      label.className = 'text-xs text-gray-500 font-semibold mb-1';
-      label.textContent = cat.name;
-      mobileContainer.appendChild(label);
+      maker.categories.forEach(cat => {
+        const label = document.createElement('div');
+        label.className = 'text-xs text-gray-500 font-semibold mb-1';
+        label.textContent = cat.name;
+        mobileContainer.appendChild(label);
 
-      const scroll = document.createElement('div');
-      scroll.className = 'mobile-stamp-scroll mb-2';
+        const scroll = document.createElement('div');
+        scroll.className = 'mobile-stamp-scroll mb-2';
 
-      cat.stamps.forEach(stamp => {
-        const btn = document.createElement('button');
-        btn.className = 'stamp-btn';
-        btn.innerHTML = `${stamp.id}<span class="stamp-size">${stamp.width}x${stamp.height}</span>`;
-        btn.style.borderLeftWidth = '3px';
-        btn.style.borderLeftColor = cat.outerStroke;
-        btn.addEventListener('click', () => {
-          frameFactory.createFrame(stamp, cat);
+        cat.stamps.forEach(stamp => {
+          const btn = document.createElement('button');
+          btn.className = 'stamp-btn';
+          btn.innerHTML = `<span class="stamp-id">${stamp.id}</span><span class="stamp-size">${stamp.width}x${stamp.height}</span>`;
+          btn.style.cssText += `border-top: 2px solid ${cat.outerStroke};`;
+          btn.addEventListener('click', () => {
+            frameFactory.createFrame(stamp, cat);
+            _updateEmptyMsg();
+          });
+          scroll.appendChild(btn);
         });
-        scroll.appendChild(btn);
-      });
 
-      mobileContainer.appendChild(scroll);
-    });
+        mobileContainer.appendChild(scroll);
+      });
+    }
+  }
+
+  // === 空状態メッセージの表示/非表示 ===
+  function _updateEmptyMsg() {
+    const msg = document.getElementById('canvas-empty-msg');
+    if (!msg) return;
+    const hasFrames = canvasManager.getStampFrames().length > 0;
+    msg.classList.toggle('hidden', hasFrames);
   }
 
   // === 整列ボタン ===
@@ -127,7 +158,10 @@
     // 選択削除
     const btnDeleteSelected = document.getElementById('btn-delete-selected');
     if (btnDeleteSelected) {
-      btnDeleteSelected.addEventListener('click', () => frameFactory.deleteSelected());
+      btnDeleteSelected.addEventListener('click', () => {
+        frameFactory.deleteSelected();
+        _updateEmptyMsg();
+      });
     }
 
     // 全削除
@@ -137,6 +171,7 @@
         if (canvasManager.getStampFrames().length === 0) return;
         if (confirm('全てのスタンプ枠を削除しますか？')) {
           frameFactory.deleteAll();
+          _updateEmptyMsg();
         }
       });
     }
@@ -164,7 +199,10 @@
     // モバイル用ボタン
     const mobileDelete = document.getElementById('mobile-btn-delete');
     if (mobileDelete) {
-      mobileDelete.addEventListener('click', () => frameFactory.deleteSelected());
+      mobileDelete.addEventListener('click', () => {
+        frameFactory.deleteSelected();
+        _updateEmptyMsg();
+      });
     }
 
     const mobileClear = document.getElementById('mobile-btn-clear');
@@ -173,6 +211,7 @@
         if (canvasManager.getStampFrames().length === 0) return;
         if (confirm('全てのスタンプ枠を削除しますか？')) {
           frameFactory.deleteAll();
+          _updateEmptyMsg();
         }
       });
     }
@@ -191,15 +230,12 @@
     const btnOut = document.getElementById('zoom-out');
     const btnFit = document.getElementById('zoom-fit');
 
-    // スライダー操作
     if (slider) {
       slider.addEventListener('input', () => {
-        const pct = parseInt(slider.value);
-        canvasManager.setZoomPercent(pct);
+        canvasManager.setZoomPercent(parseInt(slider.value));
       });
     }
 
-    // +-ボタン
     if (btnIn) {
       btnIn.addEventListener('click', () => {
         const newVal = Math.min(500, parseInt(slider.value) + 25);
@@ -215,7 +251,6 @@
       });
     }
 
-    // フィットボタン
     if (btnFit) {
       btnFit.addEventListener('click', () => {
         canvasManager.resetView();
@@ -223,7 +258,6 @@
       });
     }
 
-    // ズーム変更イベントをリッスン（ホイール/ピンチ連動）
     document.addEventListener('zoom-change', (e) => {
       const pct = e.detail.percent;
       if (label) label.textContent = pct + '%';
@@ -231,7 +265,7 @@
     });
   }
 
-  // === 選択イベント（削除ボタンの有効/無効） ===
+  // === 選択イベント ===
   function _setupSelectionEvents() {
     const canvas = canvasManager.getCanvas();
 
@@ -258,7 +292,6 @@
       panel.classList.toggle('collapsed');
     });
 
-    // パネル外クリックで閉じる
     document.getElementById('canvas-area').addEventListener('click', () => {
       if (!panel.classList.contains('collapsed')) {
         panel.classList.add('collapsed');
@@ -269,17 +302,17 @@
   // === キーボードショートカット ===
   function _setupKeyboard() {
     document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
       // Delete / Backspace: 選択削除
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        // テキスト入力中は無視
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         e.preventDefault();
         frameFactory.deleteSelected();
+        _updateEmptyMsg();
       }
 
       // Ctrl+A: 全選択
       if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         e.preventDefault();
         const canvas = canvasManager.getCanvas();
         const frames = canvasManager.getStampFrames();
@@ -290,7 +323,6 @@
         }
       }
 
-      // Ctrl+Z: 元に戻す（将来実装予定のプレースホルダ）
       // Escape: 選択解除
       if (e.key === 'Escape') {
         canvasManager.getCanvas().discardActiveObject();
