@@ -1,9 +1,8 @@
-// 複数画像対応 二値化ツール
+// 複数画像対応 二値化ツール（ノイズ除去・消しゴム付き）
 
 (function () {
   'use strict';
 
-  // 画像データを管理する配列
   const images = [];
   let nextId = 1;
 
@@ -11,13 +10,11 @@
     const fileInput = document.getElementById('file-input');
     const dropZone = document.getElementById('drop-zone');
 
-    // ファイル選択（複数対応）
     fileInput.addEventListener('change', (e) => {
       _handleFiles(e.target.files);
-      fileInput.value = ''; // リセットして同じファイルを再選択可能に
+      fileInput.value = '';
     });
 
-    // ドラッグ&ドロップ
     dropZone.addEventListener('dragover', (e) => {
       e.preventDefault();
       dropZone.classList.add('drag-over');
@@ -32,40 +29,30 @@
     });
     dropZone.addEventListener('click', () => fileInput.click());
 
-    // 画像追加ボタン
-    document.getElementById('btn-add-more').addEventListener('click', () => {
-      fileInput.click();
-    });
+    document.getElementById('btn-add-more').addEventListener('click', () => fileInput.click());
 
-    // 全て自動しきい値
     document.getElementById('btn-auto-all').addEventListener('click', () => {
       images.forEach(img => {
-        const threshold = _otsuThreshold(img.originalImageData);
-        img.threshold = threshold;
+        img.threshold = _otsuThreshold(img.originalImageData);
         _applyBinarize(img);
         _updateSliderUI(img);
       });
     });
 
-    // 一括ダウンロード（ZIP）
     document.getElementById('btn-download-all').addEventListener('click', _downloadAllAsZip);
   });
 
-  // 複数ファイルを処理
   function _handleFiles(fileList) {
     const imageFiles = Array.from(fileList).filter(f => f.type.startsWith('image/'));
     if (imageFiles.length === 0) return;
-
     imageFiles.forEach(file => _loadImage(file));
   }
 
-  // 1枚の画像を読み込んで追加
   function _loadImage(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        // 元画像のキャンバスを作成
         const origCanvas = document.createElement('canvas');
         origCanvas.width = img.width;
         origCanvas.height = img.height;
@@ -73,15 +60,12 @@
         origCtx.drawImage(img, 0, 0);
         const imageData = origCtx.getImageData(0, 0, img.width, img.height);
 
-        // プレビューキャンバスを作成
         const prevCanvas = document.createElement('canvas');
         prevCanvas.width = img.width;
         prevCanvas.height = img.height;
 
-        // 自動しきい値を計算
         const threshold = _otsuThreshold(imageData);
 
-        // 画像オブジェクトを作成
         const imageObj = {
           id: nextId++,
           fileName: file.name,
@@ -91,15 +75,13 @@
           threshold: threshold,
           width: img.width,
           height: img.height,
+          eraserActive: false,
+          eraserSize: 20,
+          noiseSize: 5,
         };
 
-        // 二値化を適用
         _applyBinarize(imageObj);
-
-        // 配列に追加
         images.push(imageObj);
-
-        // UIにカードを追加
         _renderCard(imageObj);
         _updateToolbar();
       };
@@ -108,10 +90,9 @@
     reader.readAsDataURL(file);
   }
 
-  // 画像カードをDOMに追加
+  // === カード描画 ===
   function _renderCard(imageObj) {
     const list = document.getElementById('image-list');
-
     const card = document.createElement('div');
     card.className = 'image-card';
     card.id = `card-${imageObj.id}`;
@@ -133,16 +114,38 @@
           <div class="preview-wrap" id="orig-wrap-${imageObj.id}"></div>
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-xs font-medium text-gray-400 mb-1">二値化後（白=透明）</div>
-          <div class="preview-wrap" id="prev-wrap-${imageObj.id}"></div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs font-medium text-gray-400">二値化後</span>
+            <button class="eraser-toggle" id="eraser-btn-${imageObj.id}" data-action="toggle-eraser" data-id="${imageObj.id}" title="消しゴムモード">
+              <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path d="M8.106 4.086a1.5 1.5 0 012.122 0l4.688 4.686a1.5 1.5 0 010 2.122L9.728 16.08a1.5 1.5 0 01-1.06.44H5.106a1.5 1.5 0 01-1.06-.44L2.106 14.14a1.5 1.5 0 010-2.122L8.106 4.086z"/></svg>
+              消しゴム
+            </button>
+          </div>
+          <div class="preview-wrap eraser-canvas-wrap" id="prev-wrap-${imageObj.id}"></div>
+          <div class="eraser-controls" id="eraser-controls-${imageObj.id}" style="display:none;">
+            <label class="text-xs text-gray-500">サイズ:</label>
+            <input type="range" id="eraser-size-${imageObj.id}" min="5" max="100" value="${imageObj.eraserSize}" class="eraser-size-slider">
+            <span id="eraser-size-val-${imageObj.id}" class="text-xs font-mono text-gray-500 w-6 text-right">${imageObj.eraserSize}</span>
+          </div>
         </div>
       </div>
-      <div class="flex items-center gap-3 flex-wrap">
-        <label class="text-xs font-medium text-gray-500 whitespace-nowrap">しきい値:</label>
-        <input type="range" id="slider-${imageObj.id}" min="0" max="255" value="${imageObj.threshold}"
-               class="flex-1 min-w-[100px] cursor-pointer">
-        <span id="val-${imageObj.id}" class="text-xs font-mono text-gray-600 w-7 text-right">${imageObj.threshold}</span>
-        <button class="btn-sm btn-auto" data-action="auto" data-id="${imageObj.id}">自動</button>
+      <div class="controls-row">
+        <div class="flex items-center gap-3 flex-wrap flex-1">
+          <label class="text-xs font-medium text-gray-500 whitespace-nowrap">しきい値:</label>
+          <input type="range" id="slider-${imageObj.id}" min="0" max="255" value="${imageObj.threshold}"
+                 class="flex-1 min-w-[80px] cursor-pointer">
+          <span id="val-${imageObj.id}" class="text-xs font-mono text-gray-600 w-7 text-right">${imageObj.threshold}</span>
+          <button class="btn-sm btn-auto" data-action="auto" data-id="${imageObj.id}">自動</button>
+        </div>
+        <div class="controls-divider"></div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="text-xs font-medium text-gray-500 whitespace-nowrap">ノイズ除去:</label>
+          <input type="range" id="noise-${imageObj.id}" min="1" max="200" value="${imageObj.noiseSize}"
+                 class="w-20 cursor-pointer noise-slider">
+          <span id="noise-val-${imageObj.id}" class="text-xs font-mono text-gray-500 w-7 text-right">${imageObj.noiseSize}px</span>
+          <button class="btn-sm btn-noise" data-action="denoise" data-id="${imageObj.id}">適用</button>
+        </div>
+        <div class="controls-divider"></div>
         <button class="btn-sm btn-dl" data-action="download" data-id="${imageObj.id}">
           <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"/><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/></svg>
           PNG
@@ -156,7 +159,7 @@
     document.getElementById(`orig-wrap-${imageObj.id}`).appendChild(imageObj.originalCanvas);
     document.getElementById(`prev-wrap-${imageObj.id}`).appendChild(imageObj.previewCanvas);
 
-    // イベント: しきい値スライダー
+    // しきい値スライダー
     const slider = document.getElementById(`slider-${imageObj.id}`);
     slider.addEventListener('input', () => {
       imageObj.threshold = parseInt(slider.value);
@@ -164,11 +167,27 @@
       _applyBinarize(imageObj);
     });
 
-    // イベント: ボタン（イベント委譲）
+    // ノイズ除去サイズスライダー
+    const noiseSlider = document.getElementById(`noise-${imageObj.id}`);
+    noiseSlider.addEventListener('input', () => {
+      imageObj.noiseSize = parseInt(noiseSlider.value);
+      document.getElementById(`noise-val-${imageObj.id}`).textContent = imageObj.noiseSize + 'px';
+    });
+
+    // 消しゴムサイズスライダー
+    const eraserSizeSlider = document.getElementById(`eraser-size-${imageObj.id}`);
+    eraserSizeSlider.addEventListener('input', () => {
+      imageObj.eraserSize = parseInt(eraserSizeSlider.value);
+      document.getElementById(`eraser-size-val-${imageObj.id}`).textContent = imageObj.eraserSize;
+    });
+
+    // 消しゴムのイベント設定
+    _setupEraser(imageObj);
+
+    // ボタンイベント（イベント委譲）
     card.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
-
       const action = btn.dataset.action;
       const id = parseInt(btn.dataset.id);
 
@@ -184,11 +203,187 @@
         if (img) _downloadSingle(img);
       } else if (action === 'remove') {
         _removeImage(id);
+      } else if (action === 'denoise') {
+        const img = images.find(i => i.id === id);
+        if (img) _removeNoise(img);
+      } else if (action === 'toggle-eraser') {
+        const img = images.find(i => i.id === id);
+        if (img) _toggleEraser(img);
       }
     });
   }
 
-  // スライダーUIを更新
+  // === 消しゴム ===
+
+  function _toggleEraser(imageObj) {
+    imageObj.eraserActive = !imageObj.eraserActive;
+    const btn = document.getElementById(`eraser-btn-${imageObj.id}`);
+    const controls = document.getElementById(`eraser-controls-${imageObj.id}`);
+    const wrap = document.getElementById(`prev-wrap-${imageObj.id}`);
+
+    if (imageObj.eraserActive) {
+      btn.classList.add('active');
+      controls.style.display = 'flex';
+      wrap.classList.add('eraser-mode');
+    } else {
+      btn.classList.remove('active');
+      controls.style.display = 'none';
+      wrap.classList.remove('eraser-mode');
+    }
+  }
+
+  function _setupEraser(imageObj) {
+    const canvas = imageObj.previewCanvas;
+    let isDrawing = false;
+
+    // マウス座標 → キャンバスピクセル座標に変換
+    function _getCanvasPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
+      let clientX, clientY;
+      if (e.touches) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY,
+      };
+    }
+
+    function _erase(e) {
+      if (!imageObj.eraserActive || !isDrawing) return;
+      e.preventDefault();
+
+      const pos = _getCanvasPos(e);
+      const ctx = canvas.getContext('2d');
+      const r = imageObj.eraserSize * (canvas.width / canvas.getBoundingClientRect().width);
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function _startDraw(e) {
+      if (!imageObj.eraserActive) return;
+      isDrawing = true;
+      _erase(e);
+    }
+
+    function _stopDraw() {
+      isDrawing = false;
+    }
+
+    // マウス
+    canvas.addEventListener('mousedown', _startDraw);
+    canvas.addEventListener('mousemove', _erase);
+    canvas.addEventListener('mouseup', _stopDraw);
+    canvas.addEventListener('mouseleave', _stopDraw);
+
+    // タッチ
+    canvas.addEventListener('touchstart', _startDraw, { passive: false });
+    canvas.addEventListener('touchmove', _erase, { passive: false });
+    canvas.addEventListener('touchend', _stopDraw);
+    canvas.addEventListener('touchcancel', _stopDraw);
+  }
+
+  // === ノイズ除去（連結成分分析） ===
+
+  function _removeNoise(imageObj) {
+    const canvas = imageObj.previewCanvas;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+    const minSize = imageObj.noiseSize * imageObj.noiseSize;
+
+    // 不透明ピクセルのマスクを作成 (alpha > 0 = 黒ピクセル)
+    const mask = new Uint8Array(w * h);
+    for (let i = 0; i < mask.length; i++) {
+      mask[i] = data[i * 4 + 3] > 0 ? 1 : 0;
+    }
+
+    // 連結成分ラベリング（4連結）
+    const labels = new Int32Array(w * h);
+    let labelCount = 0;
+    const componentSizes = [0]; // labelCount=0は未使用
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = y * w + x;
+        if (mask[idx] === 1 && labels[idx] === 0) {
+          // 新しい連結成分をBFSで探索
+          labelCount++;
+          let size = 0;
+          const queue = [idx];
+          labels[idx] = labelCount;
+
+          while (queue.length > 0) {
+            const cur = queue.pop();
+            size++;
+            const cx = cur % w;
+            const cy = (cur - cx) / w;
+
+            // 上下左右を確認
+            const neighbors = [];
+            if (cx > 0) neighbors.push(cur - 1);
+            if (cx < w - 1) neighbors.push(cur + 1);
+            if (cy > 0) neighbors.push(cur - w);
+            if (cy < h - 1) neighbors.push(cur + w);
+
+            for (const n of neighbors) {
+              if (mask[n] === 1 && labels[n] === 0) {
+                labels[n] = labelCount;
+                queue.push(n);
+              }
+            }
+          }
+
+          componentSizes.push(size);
+        }
+      }
+    }
+
+    // 小さい成分を削除
+    let removed = 0;
+    for (let i = 0; i < labels.length; i++) {
+      const label = labels[i];
+      if (label > 0 && componentSizes[label] < minSize) {
+        // 透明にする
+        const pi = i * 4;
+        data[pi] = 0;
+        data[pi + 1] = 0;
+        data[pi + 2] = 0;
+        data[pi + 3] = 0;
+        removed++;
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+
+    // フィードバック
+    const removedComponents = componentSizes.filter((s, i) => i > 0 && s < minSize).length;
+    const statusEl = document.getElementById(`noise-val-${imageObj.id}`);
+    if (statusEl) {
+      statusEl.textContent = `${removedComponents}個除去`;
+      setTimeout(() => {
+        statusEl.textContent = imageObj.noiseSize + 'px';
+      }, 2000);
+    }
+  }
+
+  // === UI更新 ===
+
   function _updateSliderUI(imageObj) {
     const slider = document.getElementById(`slider-${imageObj.id}`);
     const valEl = document.getElementById(`val-${imageObj.id}`);
@@ -196,12 +391,10 @@
     if (valEl) valEl.textContent = imageObj.threshold;
   }
 
-  // 画像を削除
   function _removeImage(id) {
     const idx = images.findIndex(i => i.id === id);
     if (idx === -1) return;
     images.splice(idx, 1);
-
     const card = document.getElementById(`card-${id}`);
     if (card) {
       card.style.transition = 'opacity 0.2s, transform 0.2s';
@@ -209,11 +402,9 @@
       card.style.transform = 'scale(0.95)';
       setTimeout(() => card.remove(), 200);
     }
-
     setTimeout(() => _updateToolbar(), 220);
   }
 
-  // ツールバーの表示更新
   function _updateToolbar() {
     const toolbar = document.getElementById('toolbar');
     const dropZone = document.getElementById('drop-zone');
@@ -232,7 +423,8 @@
     }
   }
 
-  // 1枚ダウンロード
+  // === ダウンロード ===
+
   function _downloadSingle(imageObj) {
     const dataURL = imageObj.previewCanvas.toDataURL('image/png');
     const link = document.createElement('a');
@@ -243,10 +435,8 @@
     document.body.removeChild(link);
   }
 
-  // 一括ダウンロード（ZIP）
   async function _downloadAllAsZip() {
     if (images.length === 0) return;
-
     const btn = document.getElementById('btn-download-all');
     const origText = btn.innerHTML;
     btn.disabled = true;
@@ -254,25 +444,18 @@
 
     try {
       const zip = new JSZip();
-
       for (const img of images) {
-        // Canvas → Blob に変換
-        const blob = await new Promise(resolve => {
-          img.previewCanvas.toBlob(resolve, 'image/png');
-        });
+        const blob = await new Promise(resolve => img.previewCanvas.toBlob(resolve, 'image/png'));
         zip.file(_makeFileName(img.fileName), blob);
       }
-
       const content = await zip.generateAsync({ type: 'blob' });
       const now = new Date();
       const y = now.getFullYear();
       const m = String(now.getMonth() + 1).padStart(2, '0');
       const d = String(now.getDate()).padStart(2, '0');
-      const zipName = `二値化_${y}_${m}_${d}.zip`;
-
       const url = URL.createObjectURL(content);
       const link = document.createElement('a');
-      link.download = zipName;
+      link.download = `二値化_${y}_${m}_${d}.zip`;
       link.href = url;
       document.body.appendChild(link);
       link.click();
@@ -287,13 +470,11 @@
     }
   }
 
-  // ファイル名を生成（拡張子をpngに変換）
   function _makeFileName(originalName) {
     const baseName = originalName.replace(/\.[^.]+$/, '');
     return `${baseName}_二値化.png`;
   }
 
-  // HTMLエスケープ
   function _escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
@@ -302,22 +483,17 @@
 
   // === 二値化処理 ===
 
-  // 大津の方法でしきい値を計算
   function _otsuThreshold(imageData) {
     const data = imageData.data;
     const histogram = new Array(256).fill(0);
     const total = imageData.width * imageData.height;
-
     for (let i = 0; i < data.length; i += 4) {
       const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
       histogram[gray]++;
     }
-
     let sum = 0;
     for (let i = 0; i < 256; i++) sum += i * histogram[i];
-
     let sumB = 0, wB = 0, maxVariance = 0, threshold = 0;
-
     for (let t = 0; t < 256; t++) {
       wB += histogram[t];
       if (wB === 0) continue;
@@ -327,23 +503,17 @@
       const mB = sumB / wB;
       const mF = (sum - sumB) / wF;
       const variance = wB * wF * (mB - mF) * (mB - mF);
-      if (variance > maxVariance) {
-        maxVariance = variance;
-        threshold = t;
-      }
+      if (variance > maxVariance) { maxVariance = variance; threshold = t; }
     }
-
     return threshold;
   }
 
-  // 二値化を適用（白→透明）
   function _applyBinarize(imageObj) {
     const src = imageObj.originalImageData.data;
     const ctx = imageObj.previewCanvas.getContext('2d');
     const output = ctx.createImageData(imageObj.width, imageObj.height);
     const dst = output.data;
     const threshold = imageObj.threshold;
-
     for (let i = 0; i < src.length; i += 4) {
       const gray = 0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2];
       if (gray >= threshold) {
@@ -352,7 +522,6 @@
         dst[i] = 0; dst[i + 1] = 0; dst[i + 2] = 0; dst[i + 3] = 255;
       }
     }
-
     ctx.putImageData(output, 0, 0);
   }
 
