@@ -434,6 +434,61 @@ html, body {
   background: rgba(99, 102, 241, 0.1);
 }
 
+/* === 自動整列ボタン === */
+.auto-arrange-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #059669;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auto-arrange-btn:hover {
+  background: rgba(16, 185, 129, 0.15);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+  transform: translateY(-1px);
+}
+
+.auto-arrange-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.auto-arrange-btn svg {
+  color: #059669;
+}
+
+/* モバイル用の自動整列ボタン */
+.auto-arrange-btn-sm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #059669;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.auto-arrange-btn-sm:hover {
+  background: rgba(16, 185, 129, 0.2);
+}
+
 /* === アクションボタン === */
 .action-buttons {
   display: flex;
