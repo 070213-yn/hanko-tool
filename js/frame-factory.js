@@ -10,7 +10,8 @@ class FrameFactory {
   }
 
   // スタンプ枠を作成してキャンバスに追加
-  createFrame(stamp, category) {
+  // posOverride: { left, top } を渡すと自動配置の代わりにその位置に配置
+  createFrame(stamp, category, posOverride) {
     const { width, height } = stamp;
     const margin = category.margin;
 
@@ -80,11 +81,16 @@ class FrameFactory {
       stampWidth: width,
       stampHeight: height,
       categoryName: category.name,
+      _category: category,
     });
 
-    // 配置位置を計算
-    const pos = this._getNextPosition(width, height);
-    group.set({ left: pos.x, top: pos.y });
+    // 配置位置を計算（位置指定がある場合はそちらを使用）
+    if (posOverride && posOverride.left !== undefined) {
+      group.set({ left: posOverride.left, top: posOverride.top });
+    } else {
+      const pos = this._getNextPosition(width, height);
+      group.set({ left: pos.x, top: pos.y });
+    }
 
     // キャンバスに追加
     const canvas = this.cm.getCanvas();
@@ -169,6 +175,48 @@ class FrameFactory {
         el.textContent = `配置数: ${count}`;
       }
     }
+  }
+
+  // 選択中のスタンプ枠を90度回転（縦横切替）
+  rotateSelected() {
+    const canvas = this.cm.getCanvas();
+    const active = canvas.getActiveObjects();
+    const frames = active.filter(o => o.isStampFrame);
+    if (frames.length === 0) return;
+
+    canvas.discardActiveObject();
+
+    const newFrames = [];
+
+    frames.forEach(frame => {
+      const oldLeft = frame.left;
+      const oldTop = frame.top;
+      const cat = frame._category;
+
+      // 幅と高さを入れ替えた新しいスタンプ定義
+      const swappedStamp = {
+        id: frame.stampId,
+        width: frame.stampHeight,
+        height: frame.stampWidth,
+      };
+
+      // 古い枠を削除
+      canvas.remove(frame);
+
+      // 同じ位置に縦横入替えた新しい枠を作成
+      const newFrame = this.createFrame(swappedStamp, cat, { left: oldLeft, top: oldTop });
+      newFrames.push(newFrame);
+    });
+
+    // 新しい枠を選択状態に
+    if (newFrames.length === 1) {
+      canvas.setActiveObject(newFrames[0]);
+    } else if (newFrames.length > 1) {
+      const sel = new fabric.ActiveSelection(newFrames, { canvas });
+      canvas.setActiveObject(sel);
+    }
+
+    canvas.requestRenderAll();
   }
 
   // 選択中のオブジェクトを削除

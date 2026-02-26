@@ -102,12 +102,18 @@
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-2 min-w-0">
           <span class="text-sm font-semibold text-gray-700 truncate">${_escapeHtml(imageObj.fileName)}</span>
-          <span class="text-xs text-gray-400">${imageObj.width} x ${imageObj.height}px</span>
+          <span class="text-xs text-gray-400" id="size-${imageObj.id}">${imageObj.width} x ${imageObj.height}px</span>
         </div>
-        <button class="btn-sm btn-remove" data-action="remove" data-id="${imageObj.id}">
-          <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/></svg>
-          削除
-        </button>
+        <div class="flex items-center gap-1.5">
+          <button class="btn-sm btn-rotate" data-action="rotate" data-id="${imageObj.id}" title="90度回転">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.598a.75.75 0 00-.75.75v3.634a.75.75 0 001.5 0v-2.033l.312.311a7 7 0 0011.712-3.138.75.75 0 00-1.06-.179zm-1.624-7.848a7 7 0 00-11.712 3.138.75.75 0 001.06.179 5.5 5.5 0 019.201-2.466l.312.311H10.117a.75.75 0 000 1.5h3.634a.75.75 0 00.75-.75V1.854a.75.75 0 00-1.5 0v2.033l-.312-.311z" clip-rule="evenodd"/></svg>
+            回転
+          </button>
+          <button class="btn-sm btn-remove" data-action="remove" data-id="${imageObj.id}">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/></svg>
+            削除
+          </button>
+        </div>
       </div>
       <div class="flex gap-3 mb-3" style="flex-direction: ${window.innerWidth < 640 ? 'column' : 'row'};">
         <div class="flex-1 min-w-0">
@@ -202,6 +208,9 @@
       } else if (action === 'download') {
         const img = images.find(i => i.id === id);
         if (img) _downloadSingle(img);
+      } else if (action === 'rotate') {
+        const img = images.find(i => i.id === id);
+        if (img) _rotateImage(img);
       } else if (action === 'remove') {
         _removeImage(id);
       } else if (action === 'toggle-eraser') {
@@ -209,6 +218,59 @@
         if (img) _toggleEraser(img);
       }
     });
+  }
+
+  // === 画像回転（時計回り90度） ===
+
+  function _rotateImage(imageObj) {
+    const oldW = imageObj.width;
+    const oldH = imageObj.height;
+    const newW = oldH;
+    const newH = oldW;
+
+    // 元画像キャンバスを回転して新しいキャンバスを作成
+    const newOrigCanvas = document.createElement('canvas');
+    newOrigCanvas.width = newW;
+    newOrigCanvas.height = newH;
+    const ctx = newOrigCanvas.getContext('2d');
+
+    ctx.translate(newW, 0);
+    ctx.rotate(Math.PI / 2);
+    ctx.drawImage(imageObj.originalCanvas, 0, 0);
+
+    // 新しいImageDataを取得
+    const newImageData = ctx.getImageData(0, 0, newW, newH);
+
+    // プレビューキャンバスのサイズ変更
+    imageObj.previewCanvas.width = newW;
+    imageObj.previewCanvas.height = newH;
+
+    // DOMの元画像キャンバスを差し替え
+    const origWrap = document.getElementById(`orig-wrap-${imageObj.id}`);
+    origWrap.removeChild(imageObj.originalCanvas);
+    origWrap.appendChild(newOrigCanvas);
+
+    // imageObj を更新
+    imageObj.originalCanvas = newOrigCanvas;
+    imageObj.originalImageData = newImageData;
+    imageObj.width = newW;
+    imageObj.height = newH;
+
+    // サイズ表示を更新
+    const sizeEl = document.getElementById(`size-${imageObj.id}`);
+    if (sizeEl) sizeEl.textContent = `${newW} x ${newH}px`;
+
+    // 消しゴムモードを解除（キャンバスが変わるので）
+    if (imageObj.eraserActive) {
+      _toggleEraser(imageObj);
+    }
+
+    // 消しゴムイベントを再設定（新しいキャンバスに対して）
+    _setupEraser(imageObj);
+
+    // 二値化 + ノイズ除去を再適用
+    _applyBinarize(imageObj);
+    if (imageObj.noiseSize > 1) _removeNoise(imageObj);
   }
 
   // === 消しゴム ===

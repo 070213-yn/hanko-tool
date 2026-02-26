@@ -196,7 +196,22 @@
       });
     }
 
+    // 回転（縦横切替）
+    const btnRotate = document.getElementById('btn-rotate');
+    if (btnRotate) {
+      btnRotate.addEventListener('click', () => {
+        frameFactory.rotateSelected();
+      });
+    }
+
     // モバイル用ボタン
+    const mobileRotate = document.getElementById('mobile-btn-rotate');
+    if (mobileRotate) {
+      mobileRotate.addEventListener('click', () => {
+        frameFactory.rotateSelected();
+      });
+    }
+
     const mobileDelete = document.getElementById('mobile-btn-delete');
     if (mobileDelete) {
       mobileDelete.addEventListener('click', () => {
@@ -321,6 +336,11 @@
           canvas.setActiveObject(sel);
           canvas.requestRenderAll();
         }
+      }
+
+      // R: 選択枠を回転（縦横切替）
+      if (e.key === 'r' || e.key === 'R') {
+        frameFactory.rotateSelected();
       }
 
       // Escape: 選択解除
