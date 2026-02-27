@@ -91,7 +91,7 @@ const FRAME_DATA = {
 
   // Google Apps Script Web App URL（クラウド保存用）
   // Apps Scriptをデプロイ後にURLを設定する
-  appsScriptUrl: '',
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbwGHSp6QJFlAh7u-d8fSvbI8MjQrBpeaT5oQZTyy8AjJLak_mv3ouRZKIdD67o-MFw/exec',
 
   // シート名 → メーカーキーのマッピング
   // シート名（タブ名）がメーカー名に対応する
