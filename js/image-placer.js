@@ -128,6 +128,11 @@ class ImagePlacer {
     const innerW = stampW - margin * 2;
     const innerH = stampH - margin * 2;
 
+    // 画像配置エリア（内枠から各辺0.5mm内側に余白）
+    const imagePadding = 0.5;
+    const imageAreaW = innerW - imagePadding * 2;
+    const imageAreaH = innerH - imagePadding * 2;
+
     // 画像をFabric.jsオブジェクトとして作成（独立・操作可能）
     const fabricImg = new fabric.Image(imageData.element, {
       selectable: true,
@@ -149,14 +154,14 @@ class ImagePlacer {
     // 描画部分のバウンディングボックスを検出
     const bounds = this._detectContentBounds(imageData.element);
 
-    // 描画部分が内枠に収まる最大スケールを計算
-    const scaleX = innerW / bounds.width;
-    const scaleY = innerH / bounds.height;
+    // 描画部分が配置エリアに収まる最大スケールを計算（0.5mm余白込み）
+    const scaleX = imageAreaW / bounds.width;
+    const scaleY = imageAreaH / bounds.height;
     const scale = Math.min(scaleX, scaleY);
 
-    // 内枠の中心座標（キャンバス座標）
-    const innerCenterX = frame.left + margin + innerW / 2;
-    const innerCenterY = frame.top + margin + innerH / 2;
+    // 配置エリアの中心座標（キャンバス座標）
+    const innerCenterX = frame.left + margin + imagePadding + imageAreaW / 2;
+    const innerCenterY = frame.top + margin + imagePadding + imageAreaH / 2;
 
     // 描画部分の中心を内枠中心に合わせる
     const contentCenterX = bounds.x + bounds.width / 2;
@@ -204,9 +209,6 @@ class ImagePlacer {
 
     // 画像の配置状態を更新
     imageData.placedFrameId = frameUid;
-
-    // ラベルを非表示にする
-    this._setLabelVisible(frame, false);
 
     // 画像移動/リサイズ後にオフセット再計算
     this._setupImageTracking(fabricImg, frame);
@@ -316,8 +318,6 @@ class ImagePlacer {
 
     delete this.placements[frameUid];
 
-    // ラベルを再表示
-    this._setLabelVisible(frame, true);
   }
 
   // === 枠削除時のクリーンアップ ===
@@ -539,40 +539,6 @@ class ImagePlacer {
       frame._placerUid = 'frame_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
     }
     return frame._placerUid;
-  }
-
-  _setLabelVisible(frame, visible) {
-    const objects = frame.getObjects();
-    if (objects.length >= 3 && objects[2] instanceof fabric.Text) {
-      const sw = frame.stampWidth;
-      const sh = frame.stampHeight;
-      const margin = frame._category ? frame._category.margin : 2;
-
-      if (visible) {
-        // 画像なし: 中央に大きく表示
-        const fontSize = Math.min(sw, sh) * 0.3;
-        objects[2].set({
-          originX: 'center',
-          originY: 'center',
-          left: 0,
-          top: 0,
-          fontSize: Math.max(3, Math.min(8, fontSize)),
-          opacity: 0.4,
-        });
-      } else {
-        // 画像あり: 上部マージン内に小さく表示
-        const labelSize = Math.max(1.2, Math.min(margin - 0.1, 2));
-        objects[2].set({
-          originX: 'center',
-          originY: 'top',
-          left: 0,
-          top: -sh / 2 + 0.1,
-          fontSize: labelSize,
-          opacity: 0.8,
-        });
-      }
-      frame.dirty = true;
-    }
   }
 
   _showPlacementHint(show) {

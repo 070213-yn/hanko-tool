@@ -46,23 +46,6 @@ class FrameFactory {
       evented: false,
     });
 
-    // ラベル（スタンプID）
-    const fontSize = Math.min(width, height) * 0.3;
-    const clampedSize = Math.max(3, Math.min(8, fontSize));
-    const label = new fabric.Text(stamp.id, {
-      fontSize: clampedSize,
-      fill: category.labelColor,
-      fontFamily: 'sans-serif',
-      fontWeight: 'bold',
-      selectable: false,
-      evented: false,
-      originX: 'center',
-      originY: 'center',
-      left: width / 2,
-      top: height / 2,
-      opacity: 0.4,
-    });
-
     // サイズ表記（外枠の右下外側に表示）
     const sizeDisplay = new fabric.Text(`${stamp.id} ${width}×${height}`, {
       fontSize: 2.5,
@@ -80,7 +63,7 @@ class FrameFactory {
     });
 
     // グループ化
-    const group = new fabric.Group([outerRect, innerRect, label, sizeDisplay], {
+    const group = new fabric.Group([outerRect, innerRect, sizeDisplay], {
       left: 0,
       top: 0,
       // 拡縮・回転をロック

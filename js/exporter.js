@@ -127,9 +127,9 @@ class Exporter {
       canvas.getObjects().forEach(obj => {
         if (obj.isStampFrame) {
           const children = obj.getObjects();
-          if (children.length >= 4 && children[3].isSizeLabel) {
-            children[3].set({ visible: false });
-            sizeLabels.push(children[3]);
+          if (children.length >= 3 && children[2].isSizeLabel) {
+            children[2].set({ visible: false });
+            sizeLabels.push(children[2]);
             obj.dirty = true;
           }
         }
