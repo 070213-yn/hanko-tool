@@ -254,6 +254,9 @@ class HistoryManager {
       }
     });
 
+    // FrameFactoryの配置カウンターを復元後の枠位置に合わせて再計算
+    this.frameFactory.recalcNextPosition();
+
     canvas.discardActiveObject();
     canvas.requestRenderAll();
 

@@ -1052,11 +1052,11 @@
       imageResources: {
         resolutionInfo: {
           horizontalResolution: dpi,
-          horizontalResolutionUnit: 'PPI',
-          widthUnit: 'Inches',
+          horizontalResolutionUnit: 1, // 1 = PPI（ag-psdの数値enum）
+          widthUnit: 1,                // 1 = Inches
           verticalResolution: dpi,
-          verticalResolutionUnit: 'PPI',
-          heightUnit: 'Inches',
+          verticalResolutionUnit: 1,   // 1 = PPI
+          heightUnit: 1,               // 1 = Inches
         },
       },
       children: children,

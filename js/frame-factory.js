@@ -216,6 +216,39 @@ class FrameFactory {
     return 3 + numLines * lineHeight; // 3mm（枠下からの距離）+ 行数分
   }
 
+  // 全枠の位置から配置カウンターを再計算（Undo/Redo後に呼ぶ）
+  recalcNextPosition() {
+    const frames = this.cm.getStampFrames();
+    if (frames.length === 0) {
+      this.nextX = 5;
+      this.nextY = 10;
+      this.rowMaxHeight = 0;
+      return;
+    }
+
+    // 最下行のY座標を特定
+    const maxTop = Math.max(...frames.map(f => f.top));
+    const ROW_TOLERANCE = 1; // 同一行判定の誤差(mm)
+
+    // 最下行にある枠を抽出
+    const bottomRowFrames = frames.filter(f => Math.abs(f.top - maxTop) < ROW_TOLERANCE);
+
+    // 最下行の右端と最大高さを計算
+    let maxRight = 0;
+    let maxH = 0;
+    bottomRowFrames.forEach(f => {
+      const right = f.left + f.stampWidth;
+      if (right > maxRight) maxRight = right;
+      const memoH = this._getMemoHeight(f);
+      const effectiveH = f.stampHeight + Math.max(4, memoH);
+      if (effectiveH > maxH) maxH = effectiveH;
+    });
+
+    this.nextX = maxRight + this.padding;
+    this.nextY = maxTop;
+    this.rowMaxHeight = maxH;
+  }
+
   // 選択中のスタンプ枠を別のスタンプに差し替え
   replaceFrame(oldFrame, newStamp, newCategory) {
     const canvas = this.cm.getCanvas();
