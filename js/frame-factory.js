@@ -6,7 +6,7 @@ class FrameFactory {
     this.nextX = 5;  // 次に配置するX座標（mm）
     this.nextY = 10; // 次に配置するY座標（mm）タイトル分の余白確保
     this.rowMaxHeight = 0; // 現在行の最大高さ
-    this.padding = 6; // 枠間の余白（mm）サイズ表記分の余裕を含む
+    this.padding = 4; // 枠間の余白（mm）
   }
 
   // スタンプ枠を作成してキャンバスに追加
@@ -135,7 +135,7 @@ class FrameFactory {
 
     // 次の位置を更新
     this.nextX += width + this.padding;
-    this.rowMaxHeight = Math.max(this.rowMaxHeight, height);
+    this.rowMaxHeight = Math.max(this.rowMaxHeight, height + 3); // サイズ表記分の高さを加算
 
     return { x, y };
   }
