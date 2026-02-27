@@ -113,25 +113,12 @@ class Exporter {
     await this._sleep(100);
 
     try {
-      // エクスポートに含めないオブジェクトを一時非表示
+      // エクスポートに含めないオブジェクトを一時非表示（グリッド等）
       const hiddenObjects = [];
       canvas.getObjects().forEach(obj => {
         if (obj.excludeFromExport || obj.isGrid) {
           obj.set({ visible: false });
           hiddenObjects.push(obj);
-        }
-      });
-
-      // サイズ表記ラベルを非表示（書き出しに不要）
-      const sizeLabels = [];
-      canvas.getObjects().forEach(obj => {
-        if (obj.isStampFrame) {
-          const children = obj.getObjects();
-          if (children.length >= 3 && children[2].isSizeLabel) {
-            children[2].set({ visible: false });
-            sizeLabels.push(children[2]);
-            obj.dirty = true;
-          }
         }
       });
 
@@ -160,10 +147,6 @@ class Exporter {
 
       // 非表示にしたオブジェクトを復元
       hiddenObjects.forEach(obj => obj.set({ visible: true }));
-      sizeLabels.forEach(label => { label.set({ visible: true }); });
-      canvas.getObjects().forEach(obj => {
-        if (obj.isStampFrame) obj.dirty = true;
-      });
 
       if (gridWasVisible) {
         this.cm.gridLines.forEach(l => l.set({ visible: true }));
@@ -363,6 +346,17 @@ class Exporter {
         top: allFramesResult.top - Math.round(offsetY),
       });
 
+      // サイズ表記・メモレイヤー
+      const labelsResult = this._renderLabels(frames, multiplier);
+      if (labelsResult) {
+        psdLayers.push({
+          name: 'サイズ表記・メモ',
+          canvas: labelsResult.canvas,
+          left: labelsResult.left - Math.round(offsetX),
+          top: labelsResult.top - Math.round(offsetY),
+        });
+      }
+
       const psd = {
         width: outputW,
         height: outputH,
@@ -473,6 +467,64 @@ class Exporter {
       ctx.setLineDash(category.innerStrokeDash.length > 0
         ? category.innerStrokeDash.map(v => v * multiplier) : []);
       ctx.strokeRect(innerX, innerY, innerW, innerH);
+    });
+
+    return { canvas: c, left: canvasLeft, top: canvasTop };
+  }
+
+  // サイズ表記・メモテキストをオフスクリーンCanvasにレンダリング
+  _renderLabels(frames, multiplier) {
+    if (frames.length === 0) return null;
+
+    // 全枠+ラベル領域を含むバウンディングボックス
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    frames.forEach(f => {
+      minX = Math.min(minX, f.left);
+      minY = Math.min(minY, f.top);
+      maxX = Math.max(maxX, f.left + f.stampWidth);
+      maxY = Math.max(maxY, f.top + f.stampHeight + 4); // ラベル分の高さ
+    });
+
+    const canvasLeft = Math.round(minX * multiplier);
+    const canvasTop = Math.round(minY * multiplier);
+    const w = Math.ceil((maxX - minX) * multiplier);
+    const h = Math.ceil((maxY - minY) * multiplier);
+
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext('2d');
+
+    frames.forEach(frame => {
+      const category = frame._category;
+      const fx = (frame.left - minX) * multiplier;
+      const fy = (frame.top - minY) * multiplier;
+      const fw = frame.stampWidth * multiplier;
+      const fh = frame.stampHeight * multiplier;
+
+      // サイズ表記（右下外側、右揃え）
+      const sizeText = `${frame.stampId} ${frame.stampWidth}\u00D7${frame.stampHeight}`;
+      const sizeFontSize = Math.round(2.5 * multiplier);
+      ctx.font = `500 ${sizeFontSize}px sans-serif`;
+      ctx.fillStyle = category.labelColor;
+      ctx.globalAlpha = 0.55;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText(sizeText, fx + fw, fy + fh + 0.3 * multiplier);
+
+      // メモ（左下外側、左揃え）
+      const memo = frame.stampMemo || '';
+      if (memo) {
+        const memoFontSize = Math.round(2.2 * multiplier);
+        ctx.font = `400 ${memoFontSize}px sans-serif`;
+        ctx.fillStyle = '#6366f1';
+        ctx.globalAlpha = 0.7;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(memo, fx, fy + fh + 0.3 * multiplier);
+      }
+
+      ctx.globalAlpha = 1.0;
     });
 
     return { canvas: c, left: canvasLeft, top: canvasTop };

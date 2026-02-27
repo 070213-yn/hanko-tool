@@ -77,7 +77,6 @@ class FrameFactory {
       top: height + 0.3,
       opacity: 0.7,
       isMemoLabel: true,
-      excludeFromExport: true,
     });
 
     // グループ化
