@@ -45,9 +45,8 @@
 
     document.getElementById('btn-place-to-editor').addEventListener('click', _placeToEditor);
 
-    // PSDボタン
-    document.getElementById('btn-psd-350').addEventListener('click', () => _downloadPSD(350));
-    document.getElementById('btn-psd-600').addEventListener('click', () => _downloadPSD(600));
+    // PSDボタン（600DPIのみ、上限超えは分割）
+    document.getElementById('btn-psd-600').addEventListener('click', () => _downloadPSD600());
 
     // 下部バーのスライダーイベント
     _setupBottomBar();
@@ -928,8 +927,12 @@
     }, 0);
   }
 
-  // === PSD書出し ===
-  async function _downloadPSD(dpi) {
+  // === PSD書出し（600DPI、上限超えは2ファイル分割） ===
+  function _downloadPSD600() {
+    const DPI = 600;
+    const MAX_PX = 30000; // PSD形式の最大ピクセル数
+    const GAP = 20;       // 画像間の隙間（ピクセル）
+
     if (typeof agPsd === 'undefined') {
       alert('PSDライブラリの読み込みに失敗しました。ページを再読み込みしてください。');
       return;
@@ -945,17 +948,65 @@
       canvas: _trimTransparent(img.previewCanvas),
     }));
 
-    // PSDキャンバスサイズ = 全画像が縦に並ぶサイズ
-    const GAP = 20; // 画像間の隙間（ピクセル）
+    // 1ファイル目に収まる画像と、はみ出す画像に分割
+    const file1Images = [];
+    const file2Images = [];
+    let currentH = 0;
+
+    for (let i = 0; i < trimmedImages.length; i++) {
+      const t = trimmedImages[i];
+      const addH = t.canvas.height + (currentH > 0 ? GAP : 0);
+
+      if (currentH + addH <= MAX_PX) {
+        file1Images.push(t);
+        currentH += addH;
+      } else {
+        // この画像以降は2ファイル目へ
+        for (let j = i; j < trimmedImages.length; j++) {
+          file2Images.push(trimmedImages[j]);
+        }
+        break;
+      }
+    }
+
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+
+    try {
+      // 1ファイル目を書出し
+      _writePsdFile(file1Images, DPI, GAP,
+        file2Images.length > 0
+          ? `二値化_600DPI_${y}_${m}_${d}_1.psd`
+          : `二値化_600DPI_${y}_${m}_${d}.psd`
+      );
+
+      // 2ファイル目がある場合
+      if (file2Images.length > 0) {
+        // 少し遅延させてiPadでの連続ダウンロードを安定させる
+        setTimeout(() => {
+          _writePsdFile(file2Images, DPI, GAP,
+            `二値化_600DPI_${y}_${m}_${d}_2.psd`
+          );
+        }, 1500);
+      }
+    } catch (e) {
+      console.error('PSD書出しエラー:', e);
+      alert('PSD書出しに失敗しました。\n' + e.message);
+    }
+  }
+
+  // PSDファイル1つ分を生成してダウンロード
+  function _writePsdFile(trimmedImages, dpi, gap, filename) {
     let totalW = 0;
     let totalH = 0;
     trimmedImages.forEach(t => {
       totalW = Math.max(totalW, t.canvas.width);
       totalH += t.canvas.height;
     });
-    totalH += GAP * (trimmedImages.length - 1);
+    totalH += gap * (trimmedImages.length - 1);
 
-    // 各画像を個別レイヤーとして追加
     const children = [];
     let currentY = 0;
     for (const t of trimmedImages) {
@@ -965,37 +1016,28 @@
         left: 0,
         top: currentY,
       });
-      currentY += t.canvas.height + GAP;
+      currentY += t.canvas.height + gap;
     }
 
-    try {
-      const psd = {
-        width: totalW,
-        height: totalH,
-        imageResources: {
-          resolutionInfo: {
-            horizontalResolution: dpi,
-            horizontalResolutionUnit: 'PPI',
-            widthUnit: 'Inches',
-            verticalResolution: dpi,
-            verticalResolutionUnit: 'PPI',
-            heightUnit: 'Inches',
-          },
+    const psd = {
+      width: totalW,
+      height: totalH,
+      imageResources: {
+        resolutionInfo: {
+          horizontalResolution: dpi,
+          horizontalResolutionUnit: 'PPI',
+          widthUnit: 'Inches',
+          verticalResolution: dpi,
+          verticalResolutionUnit: 'PPI',
+          heightUnit: 'Inches',
         },
-        children: children,
-      };
+      },
+      children: children,
+    };
 
-      const result = agPsd.writePsd(psd);
-      const blob = new Blob([result], { type: 'application/octet-stream' });
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const d = String(now.getDate()).padStart(2, '0');
-      _triggerDownload(blob, `二値化_${dpi}DPI_${y}_${m}_${d}.psd`);
-    } catch (e) {
-      console.error('PSD書出しエラー:', e);
-      alert('PSD書出しに失敗しました。\n' + e.message);
-    }
+    const result = agPsd.writePsd(psd);
+    const blob = new Blob([result], { type: 'application/octet-stream' });
+    _triggerDownload(blob, filename);
   }
 
   // === 透明部分をトリミング ===
