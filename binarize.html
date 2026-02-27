@@ -15,6 +15,8 @@
   </script>
   <!-- JSZip: 一括ダウンロード用 -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <!-- ag-psd: PSD書出し用 -->
+  <script src="https://cdn.jsdelivr.net/npm/ag-psd@30.1.0/dist/bundle.js"></script>
   <style>
     body { font-family: 'Noto Sans JP', sans-serif; }
 
@@ -199,10 +201,168 @@
       border-color: #f59e0b;
       box-shadow: 0 0 0 2px rgba(245,158,11,0.2);
     }
+
+    /* ペンモード時のキャンバスラッパー */
+    .eraser-canvas-wrap.pen-mode {
+      cursor: crosshair;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 2px rgba(99,102,241,0.25);
+    }
+
+    /* 投げ縄モード時のキャンバスラッパー */
+    .eraser-canvas-wrap.lasso-mode {
+      cursor: crosshair;
+      border-color: #10b981;
+      box-shadow: 0 0 0 2px rgba(16,185,129,0.25);
+    }
+
+    /* ペンツールトグル */
+    .pen-toggle {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 3px 8px; font-size: 11px; font-weight: 600;
+      color: #6b7280; background: rgba(107,114,128,0.06);
+      border: 1px solid rgba(107,114,128,0.15);
+      border-radius: 6px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pen-toggle:hover { background: rgba(107,114,128,0.12); }
+    .pen-toggle.active {
+      color: #fff;
+      background: #6366f1;
+      border-color: #6366f1;
+      box-shadow: 0 1px 4px rgba(99,102,241,0.3);
+    }
+
+    /* 投げ縄トグル */
+    .lasso-toggle {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 3px 8px; font-size: 11px; font-weight: 600;
+      color: #6b7280; background: rgba(107,114,128,0.06);
+      border: 1px solid rgba(107,114,128,0.15);
+      border-radius: 6px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .lasso-toggle:hover { background: rgba(107,114,128,0.12); }
+    .lasso-toggle.active {
+      color: #fff;
+      background: #10b981;
+      border-color: #10b981;
+      box-shadow: 0 1px 4px rgba(16,185,129,0.3);
+    }
+
+    /* カーソル表示用 */
+    .tool-cursor {
+      position: absolute;
+      border-radius: 50%;
+      border: 1.5px solid;
+      pointer-events: none;
+      display: none;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+    }
+
+    /* 太さインジケーター */
+    .size-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      pointer-events: none;
+      z-index: 20;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .size-indicator-circle {
+      background: #000;
+      border-radius: 50%;
+    }
+    .size-indicator-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: #374151;
+      white-space: nowrap;
+    }
+
+    /* 変更適用ボタン */
+    .btn-apply {
+      color: #7c3aed; background: rgba(139,92,246,0.08);
+      border-color: rgba(139,92,246,0.2);
+    }
+    .btn-apply:hover { background: rgba(139,92,246,0.15); }
+
+    /* カード選択ハイライト */
+    .image-card.selected {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 2px rgba(99,102,241,0.3), 0 4px 16px rgba(0,0,0,0.06);
+    }
+
+    /* 固定下部バー */
+    .fixed-bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      z-index: 50;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid #e5e7eb;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+      padding: 10px 16px 12px;
+    }
+    .bottom-bar-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #6366f1;
+      margin-bottom: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .bottom-bar-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .bottom-bar-controls > div {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #6b7280;
+      font-weight: 500;
+    }
+    .bottom-bar-controls input[type="range"] {
+      width: 100px;
+    }
+    .bottom-bar-controls .bar-val {
+      font-size: 11px;
+      font-family: monospace;
+      color: #374151;
+      min-width: 28px;
+      text-align: right;
+    }
+
+    /* disabled スライダー（グレーアウト） */
+    input[type="range"]:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* PSDボタン */
+    .btn-psd {
+      color: #7c3aed; background: rgba(139,92,246,0.06);
+      border-color: rgba(139,92,246,0.15);
+    }
+    .btn-psd:hover { background: rgba(139,92,246,0.12); }
   </style>
 </head>
 <body class="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 min-h-screen">
-  <div class="max-w-5xl mx-auto px-4 py-6">
+  <div id="main-content" class="max-w-5xl mx-auto px-4 py-6" style="padding-bottom: 140px;">
     <!-- ヘッダー -->
     <div class="flex items-center justify-between mb-6">
       <div>
@@ -246,10 +406,22 @@
         <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"/><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/></svg>
         一括ダウンロード (ZIP)
       </button>
+      <button id="btn-psd-350" class="btn-sm btn-psd">PSD 350DPI</button>
+      <button id="btn-psd-600" class="btn-sm btn-psd">PSD 600DPI</button>
     </div>
 
     <!-- 画像カード一覧 -->
     <div id="image-list" class="space-y-4"></div>
+  </div>
+
+  <!-- 固定下部バー -->
+  <div id="bottom-bar" class="fixed-bottom-bar" style="display:none;">
+    <div id="bottom-bar-title" class="bottom-bar-title"></div>
+    <div class="bottom-bar-controls">
+      <div>しきい値: <input type="range" id="bar-threshold" min="0" max="255" value="128"> <span id="bar-threshold-val" class="bar-val">128</span></div>
+      <div>ノイズ除去: <input type="range" id="bar-noise" min="0" max="50" value="5"> <span id="bar-noise-val" class="bar-val">5px</span></div>
+      <div>ツールサイズ: <input type="range" id="bar-tool-size" min="5" max="100" value="20"> <span id="bar-tool-size-val" class="bar-val">20</span></div>
+    </div>
   </div>
 
   <script src="js/binarize.js"></script>

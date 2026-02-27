@@ -63,19 +63,21 @@ class FrameFactory {
       isSizeLabel: true,
     });
 
-    // メモ表示（サイズ表記の左側に配置）
-    const memoDisplay = new fabric.Text('', {
+    // メモ表示（サイズ表記の下の行に配置、折り返し対応）
+    const memoDisplay = new fabric.Textbox('', {
       fontSize: 2.2,
-      fill: '#6366f1',
+      fill: '#000000',
       fontFamily: 'sans-serif',
       fontWeight: '400',
       selectable: false,
       evented: false,
       originX: 'left',
       originY: 'top',
-      left: 0,
-      top: height + 0.3,
-      opacity: 0.7,
+      left: -width * 0.1,
+      top: height + 3,
+      width: Math.max(width * 1.2, 20),
+      opacity: 1.0,
+      splitByGrapheme: true,
       isMemoLabel: true,
     });
 

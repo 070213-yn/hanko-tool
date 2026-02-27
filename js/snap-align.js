@@ -149,7 +149,7 @@ class SnapAlign {
     const MARGIN = 5;       // A4端からの余白(mm)
     const TOP_MARGIN = 10;  // 上部余白（タイトル分）(mm)
     const GAP = 3;          // 枠同士の間隔(mm)
-    const LABEL_H = 1;      // サイズ表記分の高さ(mm)
+    const LABEL_H = 6;      // サイズ表記+メモ分の高さ(mm)
     const usableW = FRAME_DATA.A4_WIDTH - MARGIN * 2;
 
     // 画像追従のため移動前の位置を記録
@@ -296,7 +296,7 @@ class SnapAlign {
     const MARGIN = 5;
     const TOP_MARGIN = 10;
     const GAP = 3;
-    const LABEL_H = 1;
+    const LABEL_H = 6;
     const usableW = FRAME_DATA.A4_WIDTH - MARGIN * 2;
 
     // 画像追従のため移動前の位置を記録

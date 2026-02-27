@@ -39,7 +39,7 @@ class Exporter {
       minX = Math.min(minX, f.left);
       minY = Math.min(minY, f.top);
       maxX = Math.max(maxX, f.left + f.stampWidth);
-      maxY = Math.max(maxY, f.top + f.stampHeight + 4); // +4mm サイズ表記分
+      maxY = Math.max(maxY, f.top + f.stampHeight + 8); // +8mm サイズ表記+メモ分
     });
 
     // タイトルテキストを含める
@@ -589,7 +589,7 @@ class Exporter {
       minX = Math.min(minX, f.left);
       minY = Math.min(minY, f.top);
       maxX = Math.max(maxX, f.left + f.stampWidth);
-      maxY = Math.max(maxY, f.top + f.stampHeight + 4); // ラベル分の高さ
+      maxY = Math.max(maxY, f.top + f.stampHeight + 8); // ラベル+メモ分の高さ
     });
 
     const canvasLeft = Math.round(minX * multiplier);
@@ -619,16 +619,19 @@ class Exporter {
       ctx.textBaseline = 'top';
       ctx.fillText(sizeText, fx + fw, fy + fh + 0.3 * multiplier);
 
-      // メモ（左下外側、左揃え）
+      // メモ（サイズ表記の下、黒色、折り返し対応）
       const memo = frame.stampMemo || '';
       if (memo) {
         const memoFontSize = Math.round(2.2 * multiplier);
         ctx.font = `400 ${memoFontSize}px sans-serif`;
-        ctx.fillStyle = '#6366f1';
-        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = '#000000';
+        ctx.globalAlpha = 1.0;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(memo, fx, fy + fh + 0.3 * multiplier);
+        const memoX = fx - fw * 0.1;
+        const memoY = fy + fh + 3 * multiplier;
+        const memoMaxW = Math.max(fw * 1.2, 20 * multiplier);
+        this._wrapText(ctx, memo, memoX, memoY, memoMaxW, memoFontSize * 1.3);
       }
 
       ctx.globalAlpha = 1.0;
@@ -642,7 +645,7 @@ class Exporter {
     const category = frame._category;
     const fw = frame.stampWidth * multiplier;
     const fh = frame.stampHeight * multiplier;
-    const labelH = 4 * multiplier; // ラベル分の高さ
+    const labelH = 8 * multiplier; // ラベル+メモ分の高さ
 
     const w = Math.ceil(fw);
     const h = Math.ceil(fh + labelH);
@@ -662,16 +665,19 @@ class Exporter {
     ctx.textBaseline = 'top';
     ctx.fillText(sizeText, fw, fh + 0.3 * multiplier);
 
-    // メモ（左下外側、左揃え）
+    // メモ（サイズ表記の下、黒色、折り返し対応）
     const memo = frame.stampMemo || '';
     if (memo) {
       const memoFontSize = Math.round(2.2 * multiplier);
       ctx.font = `400 ${memoFontSize}px sans-serif`;
-      ctx.fillStyle = '#6366f1';
-      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = '#000000';
+      ctx.globalAlpha = 1.0;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
-      ctx.fillText(memo, 0, fh + 0.3 * multiplier);
+      const memoX = -fw * 0.1;
+      const memoY = fh + 3 * multiplier;
+      const memoMaxW = Math.max(fw * 1.2, 20 * multiplier);
+      this._wrapText(ctx, memo, memoX, memoY, memoMaxW, memoFontSize * 1.3);
     }
 
     return {
@@ -721,5 +727,32 @@ class Exporter {
       left: Math.round(frame.left * multiplier),
       top: Math.round(frame.top * multiplier),
     };
+  }
+
+  // テキスト折り返し描画（日本語対応: 1文字ずつ幅をチェック）
+  _wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+    let line = '';
+    let currentY = y;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === '\n') {
+        ctx.fillText(line, x, currentY);
+        line = '';
+        currentY += lineHeight;
+        continue;
+      }
+      const testLine = line + ch;
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth && line.length > 0) {
+        ctx.fillText(line, x, currentY);
+        line = ch;
+        currentY += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    if (line) {
+      ctx.fillText(line, x, currentY);
+    }
   }
 }

@@ -900,6 +900,15 @@
     const input = document.getElementById('title-input');
     if (!input) return;
 
+    // ページ読み込み時に今日の日付をドロップダウンにセット
+    const now = new Date();
+    const yearSel = document.getElementById('title-year');
+    const monthSel = document.getElementById('title-month');
+    const daySel = document.getElementById('title-day');
+    if (yearSel) yearSel.value = String(now.getFullYear());
+    if (monthSel) monthSel.value = String(now.getMonth() + 1);
+    if (daySel) daySel.value = String(now.getDate());
+
     const canvas = canvasManager.getCanvas();
 
     // A4上部左揃えにタイトルテキストを作成（mm単位）
