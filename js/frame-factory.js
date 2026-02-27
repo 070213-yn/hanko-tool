@@ -263,11 +263,12 @@ class FrameFactory {
             });
           }
           img.setCoords();
+          img.dirty = true; // Fabric.jsに再描画を強制
         }
       });
     });
 
-    canvas.requestRenderAll();
+    canvas.renderAll();
   }
 
   // 選択中のスタンプ枠を90度回転（縦横切替）
