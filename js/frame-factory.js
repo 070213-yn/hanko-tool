@@ -64,6 +64,7 @@ class FrameFactory {
     });
 
     // メモ表示（サイズ表記の下の行に配置、折り返し対応）
+    // グループのバウンディングボックスを崩さないよう left: 0 にする
     const memoDisplay = new fabric.Textbox('', {
       fontSize: 2.2,
       fill: '#000000',
@@ -73,9 +74,9 @@ class FrameFactory {
       evented: false,
       originX: 'left',
       originY: 'top',
-      left: -width * 0.1,
+      left: 0,
       top: height + 3,
-      width: Math.max(width * 1.2, 20),
+      width: Math.max(width, 20),
       opacity: 1.0,
       splitByGrapheme: true,
       isMemoLabel: true,

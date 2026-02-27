@@ -628,9 +628,9 @@ class Exporter {
         ctx.globalAlpha = 1.0;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        const memoX = fx - fw * 0.1;
+        const memoX = fx;
         const memoY = fy + fh + 3 * multiplier;
-        const memoMaxW = Math.max(fw * 1.2, 20 * multiplier);
+        const memoMaxW = Math.max(fw, 20 * multiplier);
         this._wrapText(ctx, memo, memoX, memoY, memoMaxW, memoFontSize * 1.3);
       }
 
@@ -674,9 +674,9 @@ class Exporter {
       ctx.globalAlpha = 1.0;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
-      const memoX = -fw * 0.1;
+      const memoX = 0;
       const memoY = fh + 3 * multiplier;
-      const memoMaxW = Math.max(fw * 1.2, 20 * multiplier);
+      const memoMaxW = Math.max(fw, 20 * multiplier);
       this._wrapText(ctx, memo, memoX, memoY, memoMaxW, memoFontSize * 1.3);
     }
 
