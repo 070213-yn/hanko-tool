@@ -113,9 +113,6 @@ html, body {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: 16px;
-  padding-left: 16px;
-  border-left: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .title-input {
