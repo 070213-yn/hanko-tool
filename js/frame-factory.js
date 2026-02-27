@@ -204,7 +204,45 @@ class FrameFactory {
       window.imagePlacer.restorePlacement(newFrame, placementInfo);
     }
 
+    // 重なり解消のため全枠を自動整列
+    this.rearrangeAll();
+
+    // 差し替えた枠を選択状態に
+    canvas.setActiveObject(newFrame);
+
     return newFrame;
+  }
+
+  // 全枠を自動整列（重なりを解消して詰め直す）
+  rearrangeAll() {
+    const canvas = this.cm.getCanvas();
+    const frames = this.cm.getStampFrames();
+    if (frames.length === 0) return;
+
+    // 現在の位置順でソート（上→下、同じ行なら左→右）
+    frames.sort((a, b) => {
+      if (Math.abs(a.top - b.top) > 5) return a.top - b.top;
+      return a.left - b.left;
+    });
+
+    // 配置位置をリセット
+    this.nextX = 5;
+    this.nextY = 10;
+    this.rowMaxHeight = 0;
+
+    // 各枠を再配置
+    frames.forEach(frame => {
+      const pos = this._getNextPosition(frame.stampWidth, frame.stampHeight);
+      frame.set({ left: pos.x, top: pos.y });
+      frame.setCoords();
+
+      // 配置済み画像を追従させる
+      if (window.imagePlacer) {
+        window.imagePlacer._syncImageToFrame(frame);
+      }
+    });
+
+    canvas.requestRenderAll();
   }
 
   // 選択中のスタンプ枠を90度回転（縦横切替）
