@@ -63,8 +63,25 @@ class FrameFactory {
       isSizeLabel: true,
     });
 
+    // メモ表示（サイズ表記の左側に配置）
+    const memoDisplay = new fabric.Text('', {
+      fontSize: 2.2,
+      fill: '#6366f1',
+      fontFamily: 'sans-serif',
+      fontWeight: '400',
+      selectable: false,
+      evented: false,
+      originX: 'left',
+      originY: 'top',
+      left: 0,
+      top: height + 0.3,
+      opacity: 0.7,
+      isMemoLabel: true,
+      excludeFromExport: true,
+    });
+
     // グループ化
-    const group = new fabric.Group([outerRect, innerRect, sizeDisplay], {
+    const group = new fabric.Group([outerRect, innerRect, sizeDisplay, memoDisplay], {
       left: 0,
       top: 0,
       // 拡縮・回転をロック
@@ -81,6 +98,7 @@ class FrameFactory {
       stampWidth: width,
       stampHeight: height,
       stampMargin: margin,
+      stampMemo: '',
       categoryName: category.name,
       _category: category,
     });
@@ -378,6 +396,18 @@ class FrameFactory {
     canvas.discardActiveObject();
     canvas.requestRenderAll();
     this._updateFrameCount();
+  }
+
+  // スタンプ枠のメモを更新
+  updateMemo(frame, text) {
+    frame.stampMemo = text || '';
+    const objects = frame.getObjects();
+    const memoObj = objects.find(o => o.isMemoLabel);
+    if (memoObj) {
+      memoObj.set('text', text || '');
+      frame.dirty = true;
+      this.cm.getCanvas().requestRenderAll();
+    }
   }
 
   // 全スタンプ枠を削除

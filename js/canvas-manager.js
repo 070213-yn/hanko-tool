@@ -225,63 +225,101 @@ class CanvasManager {
     });
   }
 
-  // ピンチズーム・2本指パン（タッチ対応）
+  // ピンチズーム・2本指パン（タッチ対応 - ネイティブタッチイベント使用）
   _setupTouch() {
+    const canvasWrapper = this.canvas.wrapperEl || this.containerEl;
+
     let lastDist = 0;
     let lastCenter = null;
-    let touching = false;
+    let isTwoFingerTouch = false;
 
-    this.canvas.on('touch:gesture', (opt) => {
-      const e = opt.e;
-      if (e.touches && e.touches.length === 2) {
-        touching = true;
+    // 2本指の距離を計算
+    const getTouchDist = (t1, t2) => {
+      return Math.sqrt(
+        (t2.clientX - t1.clientX) ** 2 +
+        (t2.clientY - t1.clientY) ** 2
+      );
+    };
+
+    // 2本指の中心を計算
+    const getTouchCenter = (t1, t2) => {
+      return {
+        x: (t1.clientX + t2.clientX) / 2,
+        y: (t1.clientY + t2.clientY) / 2,
+      };
+    };
+
+    canvasWrapper.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        // 2本指タッチ開始 → キャンバス操作モードに入る
+        isTwoFingerTouch = true;
         this.canvas.selection = false;
+        // Fabric.jsのオブジェクトドラッグを一時無効化
+        this.canvas.forEachObject(obj => { obj._touchEvented = obj.evented; obj.evented = false; });
 
-        const t1 = e.touches[0];
-        const t2 = e.touches[1];
+        lastDist = getTouchDist(e.touches[0], e.touches[1]);
+        lastCenter = getTouchCenter(e.touches[0], e.touches[1]);
 
-        const dist = Math.sqrt(
-          Math.pow(t2.clientX - t1.clientX, 2) +
-          Math.pow(t2.clientY - t1.clientY, 2)
-        );
-
-        const center = {
-          x: (t1.clientX + t2.clientX) / 2,
-          y: (t1.clientY + t2.clientY) / 2,
-        };
-
-        if (lastDist > 0) {
-          const scale = dist / lastDist;
-          let newZoom = this.zoom * scale;
-          newZoom = Math.max(this.minZoom, Math.min(this.maxZoom, newZoom));
-
-          const point = new fabric.Point(center.x, center.y);
-          this.canvas.zoomToPoint(point, newZoom);
-          this.zoom = newZoom;
-
-          if (lastCenter) {
-            const vpt = this.canvas.viewportTransform;
-            vpt[4] += center.x - lastCenter.x;
-            vpt[5] += center.y - lastCenter.y;
-            this.canvas.setViewportTransform(vpt);
-          }
-
-          this._onZoomChange();
-        }
-
-        lastDist = dist;
-        lastCenter = center;
+        e.preventDefault();
       }
-    });
+    }, { passive: false });
 
-    // タッチ終了時のリセット
-    const canvasWrapper = this.canvas.wrapperEl || this.containerEl;
+    canvasWrapper.addEventListener('touchmove', (e) => {
+      if (!isTwoFingerTouch || e.touches.length < 2) return;
+
+      e.preventDefault();
+
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = getTouchDist(t1, t2);
+      const center = getTouchCenter(t1, t2);
+
+      // --- ピンチズーム ---
+      if (lastDist > 0) {
+        const scale = dist / lastDist;
+        let newZoom = this.zoom * scale;
+        newZoom = Math.max(this.minZoom, Math.min(this.maxZoom, newZoom));
+
+        // 2本指の中心を基準にズーム
+        const canvasRect = canvasWrapper.getBoundingClientRect();
+        const point = new fabric.Point(
+          center.x - canvasRect.left,
+          center.y - canvasRect.top
+        );
+        this.canvas.zoomToPoint(point, newZoom);
+        this.zoom = newZoom;
+      }
+
+      // --- 2本指パン（移動） ---
+      if (lastCenter) {
+        const dx = center.x - lastCenter.x;
+        const dy = center.y - lastCenter.y;
+        const vpt = this.canvas.viewportTransform;
+        vpt[4] += dx;
+        vpt[5] += dy;
+        this.canvas.setViewportTransform(vpt);
+      }
+
+      lastDist = dist;
+      lastCenter = center;
+
+      this._onZoomChange();
+    }, { passive: false });
+
     const resetTouch = () => {
-      if (touching) {
+      if (isTwoFingerTouch) {
+        isTwoFingerTouch = false;
         lastDist = 0;
         lastCenter = null;
-        touching = false;
         this.canvas.selection = true;
+        // オブジェクトのevented状態を復元
+        this.canvas.forEachObject(obj => {
+          if (obj._touchEvented !== undefined) {
+            obj.evented = obj._touchEvented;
+            delete obj._touchEvented;
+          }
+        });
+        this.canvas.requestRenderAll();
       }
     };
 

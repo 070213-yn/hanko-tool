@@ -71,6 +71,7 @@ class HistoryManager {
       stampId: entry.stampId,
       stampWidth: entry.stampWidth,
       stampHeight: entry.stampHeight,
+      stampMemo: entry.stampMemo || '',
       left: entry.left,
       top: entry.top,
       makerKey: this._findMakerKey(entry.category),
@@ -84,6 +85,7 @@ class HistoryManager {
       id: img.id,
       name: img.name,
       dataURL: img.dataURL,
+      memo: img.memo || '',
     }));
 
     const data = {
@@ -116,6 +118,11 @@ class HistoryManager {
         data.images.forEach(img => {
           const newId = this.imagePlacer._addImage(img.name, img.dataURL);
           idMap[img.id] = newId;
+          // 画像メモを復元
+          if (img.memo) {
+            const addedImg = this.imagePlacer.images.find(i => i.id === newId);
+            if (addedImg) addedImg.memo = img.memo;
+          }
         });
         this.imagePlacer.renderList();
       }
@@ -136,6 +143,11 @@ class HistoryManager {
           left: entry.left,
           top: entry.top,
         });
+
+        // 枠メモの復元
+        if (entry.stampMemo) {
+          this.frameFactory.updateMemo(newFrame, entry.stampMemo);
+        }
 
         // 配置画像の復元
         if (entry.placedImageId && this.imagePlacer) {
@@ -190,6 +202,7 @@ class HistoryManager {
         stampId: frame.stampId,
         stampWidth: frame.stampWidth,
         stampHeight: frame.stampHeight,
+        stampMemo: frame.stampMemo || '',
         left: frame.left,
         top: frame.top,
         category: frame._category,
@@ -226,6 +239,11 @@ class HistoryManager {
         left: entry.left,
         top: entry.top,
       });
+
+      // 枠メモの復元
+      if (entry.stampMemo) {
+        this.frameFactory.updateMemo(newFrame, entry.stampMemo);
+      }
 
       // 配置画像の復元（位置・スケール情報付き）
       if (entry.placedImageId && this.imagePlacer) {

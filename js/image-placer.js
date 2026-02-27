@@ -157,6 +157,7 @@ class ImagePlacer {
       dataURL: dataURL,
       element: img,
       placedFrameId: null,
+      memo: '',
     });
     return id;
   }
@@ -651,6 +652,7 @@ class ImagePlacer {
         <div class="placer-info">
           <span class="placer-name">${this._escapeHtml(img.name)}</span>
           <span class="placer-status">${isPlaced ? '配置済み' : (isSelected ? '選択中 - 枠をクリック' : 'ドラッグで枠に配置')}</span>
+          <input type="text" class="placer-memo" value="${this._escapeHtml(img.memo || '')}" placeholder="メモ..." data-image-id="${img.id}">
         </div>
         <button class="placer-remove" data-remove-id="${img.id}" title="リストから削除">
           <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/></svg>
@@ -658,9 +660,16 @@ class ImagePlacer {
       `;
 
       item.addEventListener('click', (e) => {
-        if (e.target.closest('.placer-remove')) return;
+        if (e.target.closest('.placer-remove') || e.target.closest('.placer-memo')) return;
         this.select(img.id);
       });
+
+      // メモ入力イベント
+      const memoInput = item.querySelector('.placer-memo');
+      if (memoInput) {
+        memoInput.addEventListener('click', (e) => e.stopPropagation());
+        memoInput.addEventListener('input', (e) => { img.memo = e.target.value; });
+      }
 
       const removeBtn = item.querySelector('.placer-remove');
       removeBtn.addEventListener('click', (e) => {

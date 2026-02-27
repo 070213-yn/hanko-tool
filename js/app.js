@@ -58,6 +58,8 @@
     _setupKeyboard();
     _setupHint();
     _setupStampToggle();
+    _setupPanelCollapse();
+    _setupFrameMemo();
     _setupImagePlacer();
     _setupHistory();
     _setupDragDrop();
@@ -97,6 +99,65 @@
     toggle.addEventListener('click', () => {
       toggle.classList.toggle('collapsed');
       body.classList.toggle('collapsed');
+    });
+  }
+
+  // === パネル折りたたみ ===
+  function _setupPanelCollapse() {
+    document.querySelectorAll('.panel-collapse-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.dataset.target;
+        const panel = document.getElementById(targetId);
+        if (!panel) return;
+        panel.classList.toggle('collapsed');
+        // キャンバスリサイズ（トランジション完了後）
+        setTimeout(() => {
+          const area = document.getElementById('canvas-area');
+          if (area) {
+            canvasManager.getCanvas().setDimensions({
+              width: area.clientWidth,
+              height: area.clientHeight,
+            });
+            canvasManager.getCanvas().requestRenderAll();
+          }
+        }, 350);
+      });
+    });
+
+    // 縦書きラベルクリックで展開
+    document.querySelectorAll('.panel-collapsed-label').forEach(label => {
+      label.addEventListener('click', () => {
+        const panel = label.closest('.panel-collapsible');
+        if (panel) {
+          panel.classList.remove('collapsed');
+          setTimeout(() => {
+            const area = document.getElementById('canvas-area');
+            if (area) {
+              canvasManager.getCanvas().setDimensions({
+                width: area.clientWidth,
+                height: area.clientHeight,
+              });
+              canvasManager.getCanvas().requestRenderAll();
+            }
+          }, 350);
+        }
+      });
+    });
+  }
+
+  // === スタンプ枠メモ（ダブルクリック編集） ===
+  function _setupFrameMemo() {
+    const canvas = canvasManager.getCanvas();
+    canvas.on('mouse:dblclick', (opt) => {
+      const target = opt.target;
+      if (!target || !target.isStampFrame) return;
+
+      const currentMemo = target.stampMemo || '';
+      const newMemo = prompt('メモを入力してください:', currentMemo);
+      if (newMemo !== null) {
+        frameFactory.updateMemo(target, newMemo);
+        historyManager.saveState();
+      }
     });
   }
 
@@ -848,6 +909,7 @@
       stampId: entry.stampId,
       stampWidth: entry.stampWidth,
       stampHeight: entry.stampHeight,
+      stampMemo: entry.stampMemo || '',
       left: entry.left,
       top: entry.top,
       makerKey: historyManager._findMakerKey(entry.category),
@@ -860,6 +922,7 @@
       id: img.id,
       name: img.name,
       dataURL: img.dataURL,
+      memo: img.memo || '',
     }));
 
     const projectData = {
@@ -960,6 +1023,11 @@
       project.images.forEach(img => {
         const newId = imagePlacer._addImage(img.name, img.dataURL);
         idMap[img.id] = newId;
+        // 画像メモを復元
+        if (img.memo) {
+          const addedImg = imagePlacer.images.find(i => i.id === newId);
+          if (addedImg) addedImg.memo = img.memo;
+        }
       });
       imagePlacer.renderList();
     }
@@ -975,6 +1043,11 @@
 
       const stamp = { id: entry.stampId, width: entry.stampWidth, height: entry.stampHeight };
       const newFrame = frameFactory.createFrame(stamp, category, { left: entry.left, top: entry.top });
+
+      // 枠メモの復元
+      if (entry.stampMemo) {
+        frameFactory.updateMemo(newFrame, entry.stampMemo);
+      }
 
       // 配置画像の復元
       if (entry.placedImageId && imagePlacer) {
