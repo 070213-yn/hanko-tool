@@ -11,7 +11,6 @@
   let historyManager;
   let storageManager;
   let currentMaker = 'karafuruya';
-  let currentProjectId = null; // 読み込み中のプロジェクトID
   let stampViewMode = 'shape'; // 'text' or 'shape'
 
   // 初期化 - window.onloadでレイアウト完了後に実行
@@ -28,11 +27,6 @@
     // IndexedDB初期化（フォールバック用）
     storageManager = new StorageManager();
     try { await storageManager.init(); } catch (e) { console.error('DB初期化エラー:', e); }
-
-    // クラウドストレージ初期化（Apps Script URL設定済みの場合）
-    if (FRAME_DATA.appsScriptUrl) {
-      window._cloudStorage = new CloudStorage(FRAME_DATA.appsScriptUrl);
-    }
 
     // グローバル公開（frame-factory等から参照）
     window.imagePlacer = imagePlacer;
@@ -772,47 +766,19 @@
     }
   }
 
-  // === 保存/読込 ===
+  // === 保存/読込（ファイルベース） ===
   function _setupStorage() {
     const btnSave = document.getElementById('btn-save');
     const btnLoad = document.getElementById('btn-load');
-    const modal = document.getElementById('load-modal');
-    const closeBtn = document.getElementById('load-modal-close');
 
     if (btnSave) btnSave.addEventListener('click', _saveProject);
-    if (btnLoad) btnLoad.addEventListener('click', _openLoadModal);
-    if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.remove('show'));
-    if (modal) {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.classList.remove('show');
-      });
-    }
+    if (btnLoad) btnLoad.addEventListener('click', _loadFromFile);
   }
 
-  // ストレージインスタンスを取得（クラウド優先、フォールバックはIndexedDB）
-  function _getStorage() {
-    if (FRAME_DATA.appsScriptUrl && window._cloudStorage) {
-      return window._cloudStorage;
-    }
-    return storageManager;
-  }
-
-  // プロジェクトを保存
-  async function _saveProject() {
-    const storage = _getStorage();
-    const isCloud = storage instanceof CloudStorage;
-
-    if (!isCloud && (!storageManager || !storageManager.db)) {
-      alert('保存機能の初期化に失敗しました。ページを再読み込みしてください。');
-      return;
-    }
-
+  // プロジェクトをJSONファイルとしてダウンロード保存
+  function _saveProject() {
     const titleInput = document.getElementById('title-input');
     const title = (titleInput && titleInput.value.trim()) || '入稿データ';
-
-    // ローディング表示
-    const btn = document.getElementById('btn-save');
-    if (btn) { btn.disabled = true; btn.textContent = '保存中...'; }
 
     // 現在のキャンバス状態をキャプチャ
     const snapshot = historyManager._capture();
@@ -835,135 +801,67 @@
     }));
 
     const projectData = {
+      title: title,
+      maker: currentMaker,
       frames: serialized,
       images: images,
       nextId: imagePlacer.nextId,
-      maker: currentMaker,
     };
 
-    try {
-      if (isCloud) {
-        // クラウド保存
-        const newId = await storage.save({
-          id: currentProjectId || null,
-          title: title,
-          data: projectData,
-        });
-        currentProjectId = newId;
-      } else {
-        // IndexedDB保存
-        const project = {
-          title: title,
-          timestamp: Date.now(),
-          frameCount: serialized.length,
-          maker: currentMaker,
-          data: projectData,
-        };
-        if (currentProjectId) {
-          project.id = currentProjectId;
-          await storageManager.update(project);
-        } else {
-          const newId = await storageManager.save(project);
-          currentProjectId = newId;
-        }
-      }
-      _showSaveNotice(title);
-    } catch (e) {
-      console.error('保存エラー:', e);
-      alert('保存に失敗しました。\n' + e.message);
-    } finally {
-      if (btn) { btn.disabled = false; btn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z"/></svg> 保存'; }
-    }
-  }
+    // JSONファイルとしてダウンロード
+    const json = JSON.stringify(projectData);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const fileName = (title.replace(/[\\/:*?"<>|]/g, '') || '入稿データ') + '.json';
 
-  // 保存完了通知（一時表示）
-  function _showSaveNotice(title) {
+    const link = document.createElement('a');
+    link.download = fileName;
+    link.href = url;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    // 保存完了通知
     const btn = document.getElementById('btn-save');
-    if (!btn) return;
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg> 保存済み';
-    btn.style.color = '#059669';
-    setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; }, 1500);
-  }
-
-  // 読込モーダルを開く
-  async function _openLoadModal() {
-    const modal = document.getElementById('load-modal');
-    const list = document.getElementById('load-list');
-    const empty = document.getElementById('load-empty');
-    if (!modal || !list) return;
-
-    list.innerHTML = '';
-    const storage = _getStorage();
-    const isCloud = storage instanceof CloudStorage;
-
-    try {
-      const projects = isCloud ? await storage.getAll() : await storageManager.getAll();
-
-      if (projects.length === 0) {
-        empty.classList.add('show');
-        list.style.display = 'none';
-      } else {
-        empty.classList.remove('show');
-        list.style.display = 'block';
-
-        projects.forEach(proj => {
-          let dateStr = '';
-          if (proj.timestamp) {
-            const d = new Date(proj.timestamp);
-            dateStr = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-          }
-
-          const item = document.createElement('div');
-          item.className = 'load-item';
-          item.innerHTML = `
-            <div class="load-item-info">
-              <span class="load-item-title">${_escapeHtml(proj.title || '入稿データ')}</span>
-              <span class="load-item-meta">${dateStr}</span>
-            </div>
-            <div class="load-item-actions">
-              <button class="load-item-btn" data-load-id="${proj.id}">読込</button>
-              <button class="load-item-delete" data-delete-id="${proj.id}">&times;</button>
-            </div>
-          `;
-
-          item.querySelector('.load-item-btn').addEventListener('click', async () => {
-            await _loadProject(proj.id);
-            modal.classList.remove('show');
-          });
-
-          item.querySelector('.load-item-delete').addEventListener('click', async (e) => {
-            e.stopPropagation();
-            if (confirm(`「${proj.title}」を削除しますか？`)) {
-              await storage.delete(proj.id);
-              if (currentProjectId === proj.id) currentProjectId = null;
-              item.remove();
-              const remaining = isCloud ? await storage.getAll() : await storageManager.getAll();
-              if (remaining.length === 0) {
-                empty.classList.add('show');
-                list.style.display = 'none';
-              }
-            }
-          });
-
-          list.appendChild(item);
-        });
-      }
-
-      modal.classList.add('show');
-    } catch (e) {
-      console.error('読込一覧エラー:', e);
-      alert('保存データの読み取りに失敗しました。\n' + e.message);
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg> 保存済み';
+      btn.style.color = '#059669';
+      setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; }, 1500);
     }
   }
 
-  // プロジェクトを読み込み
-  async function _loadProject(id) {
-    const storage = _getStorage();
-    const isCloud = storage instanceof CloudStorage;
-    const project = isCloud ? await storage.get(id) : await storageManager.get(id);
-    if (!project) return;
+  // ファイルを選択して読み込み
+  function _loadFromFile() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
 
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const project = JSON.parse(ev.target.result);
+          if (!project.frames || !Array.isArray(project.frames)) {
+            alert('無効なファイルです。');
+            return;
+          }
+          _loadProjectData(project);
+        } catch (err) {
+          console.error('読込エラー:', err);
+          alert('ファイルの読み込みに失敗しました。');
+        }
+      };
+      reader.readAsText(file);
+    });
+    input.click();
+  }
+
+  // プロジェクトデータからキャンバスを復元
+  function _loadProjectData(project) {
     // 現在のキャンバスをクリア
     frameFactory.deleteAll();
     imagePlacer.images = [];
@@ -973,16 +871,17 @@
     imagePlacer.renderList();
 
     // タイトルを復元
+    const title = project.title || '入稿データ';
     const titleInput = document.getElementById('title-input');
-    if (titleInput) titleInput.value = project.title;
+    if (titleInput) titleInput.value = title;
     const canvas = canvasManager.getCanvas();
     const titleObj = canvas.getObjects().find(o => o.isTitleText);
     if (titleObj) {
-      titleObj.set('text', project.title);
+      titleObj.set('text', title);
     }
 
     // メーカータブを復元
-    const maker = project.maker || (project.data && project.data.maker);
+    const maker = project.maker;
     if (maker) {
       currentMaker = maker;
       document.querySelectorAll('.maker-tab').forEach(t => {
@@ -993,24 +892,22 @@
       _renderStampList(currentMaker);
     }
 
-    const data = project.data;
-
     // 画像を復元
     const idMap = {};
-    if (data.images && data.images.length > 0) {
-      data.images.forEach(img => {
+    if (project.images && project.images.length > 0) {
+      project.images.forEach(img => {
         const newId = imagePlacer._addImage(img.name, img.dataURL);
         idMap[img.id] = newId;
       });
       imagePlacer.renderList();
     }
-    if (data.nextId) {
-      imagePlacer.nextId = Math.max(imagePlacer.nextId, data.nextId);
+    if (project.nextId) {
+      imagePlacer.nextId = Math.max(imagePlacer.nextId, project.nextId);
     }
 
     // 枠を復元
     historyManager._isRestoring = true;
-    data.frames.forEach(entry => {
+    project.frames.forEach(entry => {
       const category = historyManager._findCategory(entry.makerKey, entry.categoryName);
       if (!category) return;
 
@@ -1032,9 +929,6 @@
     historyManager.undoStack = [];
     historyManager.redoStack = [];
     historyManager.saveState();
-
-    // 現在のプロジェクトIDを記録（上書き保存用）
-    currentProjectId = id;
 
     _updateEmptyMsg();
     canvas.discardActiveObject();
