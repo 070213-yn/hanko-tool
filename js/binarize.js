@@ -948,48 +948,55 @@
       canvas: _trimTransparent(img.previewCanvas),
     }));
 
-    // 1ファイル目に収まる画像と、はみ出す画像に分割
-    const file1Images = [];
-    const file2Images = [];
+    // 上限に収まるようにファイル単位で分割
+    const fileGroups = []; // [ [img, img, ...], [img, img, ...], ... ]
+    let currentGroup = [];
     let currentH = 0;
 
-    for (let i = 0; i < trimmedImages.length; i++) {
-      const t = trimmedImages[i];
+    for (const t of trimmedImages) {
       const addH = t.canvas.height + (currentH > 0 ? GAP : 0);
 
       if (currentH + addH <= MAX_PX) {
-        file1Images.push(t);
+        currentGroup.push(t);
         currentH += addH;
       } else {
-        // この画像以降は2ファイル目へ
-        for (let j = i; j < trimmedImages.length; j++) {
-          file2Images.push(trimmedImages[j]);
+        // 現在のグループを確定して新しいグループを開始
+        if (currentGroup.length > 0) {
+          fileGroups.push(currentGroup);
         }
-        break;
+        currentGroup = [t];
+        currentH = t.canvas.height;
       }
+    }
+    if (currentGroup.length > 0) {
+      fileGroups.push(currentGroup);
     }
 
     const now = new Date();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, '0');
     const d = String(now.getDate()).padStart(2, '0');
+    const totalFiles = fileGroups.length;
 
     try {
-      // 1ファイル目を書出し
-      _writePsdFile(file1Images, DPI, GAP,
-        file2Images.length > 0
-          ? `二値化_600DPI_${y}_${m}_${d}_1.psd`
-          : `二値化_600DPI_${y}_${m}_${d}.psd`
-      );
+      fileGroups.forEach((group, idx) => {
+        const filename = totalFiles === 1
+          ? `二値化_600DPI_${y}_${m}_${d}.psd`
+          : `二値化_600DPI_${y}_${m}_${d}_${idx + 1}.psd`;
 
-      // 2ファイル目がある場合
-      if (file2Images.length > 0) {
-        // 少し遅延させてiPadでの連続ダウンロードを安定させる
-        setTimeout(() => {
-          _writePsdFile(file2Images, DPI, GAP,
-            `二値化_600DPI_${y}_${m}_${d}_2.psd`
-          );
-        }, 1500);
+        // iPadでの連続ダウンロード安定のため遅延
+        const delay = idx * 1500;
+        if (delay === 0) {
+          _writePsdFile(group, DPI, GAP, filename);
+        } else {
+          setTimeout(() => {
+            _writePsdFile(group, DPI, GAP, filename);
+          }, delay);
+        }
+      });
+
+      if (totalFiles > 1) {
+        alert(`画像数が多いため${totalFiles}ファイルに分割してダウンロードします。`);
       }
     } catch (e) {
       console.error('PSD書出しエラー:', e);
