@@ -336,18 +336,15 @@ class Exporter {
         });
       }
 
-      // 各スタンプ枠ごとにグループ
+      // 配置画像を個別レイヤーとして追加
       frames.forEach(frame => {
-        const groupChildren = [];
-
-        // 画像レイヤー（配置済みの場合）
         if (window.imagePlacer) {
           const uid = window.imagePlacer._getFrameUid(frame);
           const placement = window.imagePlacer.placements[uid];
           if (placement && placement.fabricImg) {
             const imgResult = this._renderPlacedImage(placement.fabricImg, frame, multiplier);
             if (imgResult) {
-              groupChildren.push({
+              psdLayers.push({
                 name: '画像 - ' + frame.stampId,
                 canvas: imgResult.canvas,
                 left: imgResult.left - Math.round(offsetX),
@@ -356,21 +353,15 @@ class Exporter {
             }
           }
         }
+      });
 
-        // 枠線レイヤー
-        const frameResult = this._renderFrameLines(frame, multiplier);
-        groupChildren.push({
-          name: '枠線 - ' + frame.stampId,
-          canvas: frameResult.canvas,
-          left: frameResult.left - Math.round(offsetX),
-          top: frameResult.top - Math.round(offsetY),
-        });
-
-        psdLayers.push({
-          name: frame.stampId,
-          opened: true,
-          children: groupChildren,
-        });
+      // 全枠線を1枚のレイヤーにまとめて描画
+      const allFramesResult = this._renderAllFrameLines(frames, multiplier);
+      psdLayers.push({
+        name: '枠線（全体）',
+        canvas: allFramesResult.canvas,
+        left: allFramesResult.left - Math.round(offsetX),
+        top: allFramesResult.top - Math.round(offsetY),
       });
 
       const psd = {
@@ -436,7 +427,59 @@ class Exporter {
     };
   }
 
-  // 枠線をオフスクリーンCanvasにレンダリング
+  // 全枠線を1枚のCanvasにまとめてレンダリング
+  _renderAllFrameLines(frames, multiplier) {
+    // 全枠を含むバウンディングボックス
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    frames.forEach(f => {
+      minX = Math.min(minX, f.left);
+      minY = Math.min(minY, f.top);
+      maxX = Math.max(maxX, f.left + f.stampWidth);
+      maxY = Math.max(maxY, f.top + f.stampHeight);
+    });
+
+    const canvasLeft = Math.round(minX * multiplier);
+    const canvasTop = Math.round(minY * multiplier);
+    const w = Math.ceil((maxX - minX) * multiplier);
+    const h = Math.ceil((maxY - minY) * multiplier);
+
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext('2d');
+
+    // 各枠を描画
+    frames.forEach(frame => {
+      const category = frame._category;
+      const margin = category.margin;
+      const fx = (frame.left - minX) * multiplier;
+      const fy = (frame.top - minY) * multiplier;
+      const fw = frame.stampWidth * multiplier;
+      const fh = frame.stampHeight * multiplier;
+
+      // 外枠
+      ctx.strokeStyle = category.outerStroke;
+      ctx.lineWidth = 0.4 * multiplier;
+      ctx.setLineDash(category.outerStrokeDash.length > 0
+        ? category.outerStrokeDash.map(v => v * multiplier) : []);
+      ctx.strokeRect(fx, fy, fw, fh);
+
+      // 内枠
+      const innerX = fx + margin * multiplier;
+      const innerY = fy + margin * multiplier;
+      const innerW = (frame.stampWidth - margin * 2) * multiplier;
+      const innerH = (frame.stampHeight - margin * 2) * multiplier;
+      ctx.strokeStyle = category.innerStroke;
+      ctx.lineWidth = 0.3 * multiplier;
+      ctx.setLineDash(category.innerStrokeDash.length > 0
+        ? category.innerStrokeDash.map(v => v * multiplier) : []);
+      ctx.strokeRect(innerX, innerY, innerW, innerH);
+    });
+
+    return { canvas: c, left: canvasLeft, top: canvasTop };
+  }
+
+  // 枠線をオフスクリーンCanvasにレンダリング（単体用、互換性のため残す）
   _renderFrameLines(frame, multiplier) {
     const category = frame._category;
     const w = Math.ceil(frame.stampWidth * multiplier);
