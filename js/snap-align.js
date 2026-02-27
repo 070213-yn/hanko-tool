@@ -148,8 +148,15 @@ class SnapAlign {
 
     const MARGIN = 5;       // A4端からの余白(mm)
     const TOP_MARGIN = 10;  // 上部余白（タイトル分）(mm)
-    const GAP = 3;          // 枠同士の間隔(mm)
+    const GAP = 4;          // 枠同士の間隔(mm)
+    const LABEL_H = 3;      // サイズ表記分の高さ(mm)
     const usableW = FRAME_DATA.A4_WIDTH - MARGIN * 2;
+
+    // 画像追従のため移動前の位置を記録
+    const oldPositions = new Map();
+    frames.forEach(f => {
+      oldPositions.set(f, { left: f.left, top: f.top });
+    });
 
     // 1. スタンプIDでグループ化（同じ種類をまとめる）
     const groups = new Map();
@@ -202,11 +209,10 @@ class SnapAlign {
       let bestWaste = Infinity;
 
       for (const shelf of shelves) {
-        if (shelf.height >= block.height && shelf.remainingW >= block.totalWidth) {
-          // 高さの無駄 + 幅の無駄を評価
-          const heightWaste = shelf.height - block.height;
+        if (shelf.height >= block.height + LABEL_H && shelf.remainingW >= block.totalWidth) {
+          const heightWaste = shelf.height - block.height - LABEL_H;
           const widthWaste = shelf.remainingW - block.totalWidth;
-          const waste = heightWaste * 10 + widthWaste; // 高さの無駄を重視
+          const waste = heightWaste * 10 + widthWaste;
           if (waste < bestWaste) {
             bestWaste = waste;
             bestShelf = shelf;
@@ -242,14 +248,43 @@ class SnapAlign {
 
         shelves.push({
           y: y,
-          height: block.height,
+          height: block.height + LABEL_H,  // サイズ表記分を加算
           remainingW: usableW - block.totalWidth - GAP
         });
       }
     }
 
+    // 配置済み画像を枠の移動に追従させる
+    const placedImages = canvas.getObjects().filter(o => o.isPlacedImage);
+    frames.forEach(f => {
+      const old = oldPositions.get(f);
+      const dx = f.left - old.left;
+      const dy = f.top - old.top;
+      if (dx === 0 && dy === 0) return;
+
+      const frameUid = f._placerUid;
+      if (!frameUid) return;
+
+      placedImages.forEach(img => {
+        if (img._linkedFrameUid === frameUid) {
+          img.set({
+            left: img.left + dx,
+            top: img.top + dy,
+          });
+          if (img.clipPath) {
+            img.clipPath.set({
+              left: img.clipPath.left + dx,
+              top: img.clipPath.top + dy,
+            });
+          }
+          img.setCoords();
+          img.dirty = true;
+        }
+      });
+    });
+
     canvas.discardActiveObject();
-    canvas.requestRenderAll();
+    canvas.renderAll();
   }
 
   // 整列コマンドを実行

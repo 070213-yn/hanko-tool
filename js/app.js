@@ -278,8 +278,17 @@
     const active = canvas.getActiveObject();
     if (!active) return;
 
-    // 複数選択の場合は各オブジェクトに対して実行
-    const objects = active.getObjects ? active.getObjects() : [active];
+    let objects;
+    if (active.isStampFrame || active.isPlacedImage) {
+      // 単一の枠または画像が選択されている場合
+      objects = [active];
+    } else if (active.type === 'activeSelection') {
+      // 複数選択の場合は各オブジェクトに対して実行
+      objects = active.getObjects();
+    } else {
+      return;
+    }
+
     let success = false;
     objects.forEach(obj => {
       if (imagePlacer.centerImageInFrame(obj)) {
