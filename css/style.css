@@ -136,6 +136,66 @@ html, body {
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
 }
 
+/* タイトル簡単入力ボタン */
+.title-quick-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.title-quick-btn {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+
+.title-quick-btn:hover {
+  background: rgba(99, 102, 241, 0.15);
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.15);
+}
+
+.title-quick-btn:active {
+  transform: scale(0.96);
+}
+
+.title-quick-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.title-quick-select {
+  padding: 3px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #374151;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+  outline: none;
+  cursor: pointer;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+
+.title-quick-select:focus {
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.title-quick-label {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
 .header-link {
   display: flex;
   align-items: center;
@@ -482,6 +542,67 @@ html, body {
   color: #9ca3af;
   font-weight: 400;
   margin-top: 1px;
+}
+
+/* === スタンプ図形表示モード === */
+.stamp-view-toggle {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.stamp-view-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.stamp-view-btn:hover {
+  background: rgba(99, 102, 241, 0.08);
+  color: #6366f1;
+}
+
+.stamp-view-btn.active {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #6366f1;
+}
+
+.stamp-view-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.stamp-grid-shape {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.stamp-btn-shape {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 6px 6px 4px;
+  min-width: 52px;
+  min-height: 56px;
+}
+
+.stamp-shape {
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 2px;
+  margin-bottom: 3px;
+  flex-shrink: 0;
 }
 
 /* === 整列ボタン === */

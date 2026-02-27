@@ -12,6 +12,7 @@
   let storageManager;
   let currentMaker = 'karafuruya';
   let currentProjectId = null; // 読み込み中のプロジェクトID
+  let stampViewMode = 'shape'; // 'text' or 'shape'
 
   // 初期化 - window.onloadでレイアウト完了後に実行
   window.addEventListener('load', async () => {
@@ -31,6 +32,23 @@
     // グローバル公開（frame-factory等から参照）
     window.imagePlacer = imagePlacer;
 
+    // Googleスプレッドシートからスタンプ枠データを取得
+    if (FRAME_DATA.sheetId && FRAME_DATA.sheetMakers) {
+      try {
+        const fetcher = new SheetFetcher(FRAME_DATA.sheetId);
+        const sheetData = await fetcher.fetchAll(FRAME_DATA.sheetMakers);
+        const totalStamps = Object.values(sheetData).reduce((sum, arr) => sum + arr.length, 0);
+        if (totalStamps > 0) {
+          FRAME_DATA.buildFromSheet(sheetData);
+          console.log('スプレッドシートからデータ取得成功:', totalStamps, '件');
+        }
+      } catch (e) {
+        console.warn('スプレッドシート取得失敗、デフォルトデータを使用:', e);
+      }
+    }
+
+    // メーカータブを動的生成（スプレッドシートで追加されたメーカーにも対応）
+    _buildMakerTabs();
     _setupMakerTabs();
     _renderStampList(currentMaker);
     _setupAlignButtons();
@@ -70,6 +88,45 @@
     }
   }
 
+  // === メーカータブを動的生成（スプレッドシート連携対応） ===
+  function _buildMakerTabs() {
+    const makerKeys = Object.keys(FRAME_DATA.makers);
+    if (makerKeys.length === 0) return;
+
+    // currentMakerが存在しなければ最初のメーカーに切り替え
+    if (!FRAME_DATA.makers[currentMaker]) {
+      currentMaker = makerKeys[0];
+    }
+
+    // PC用サイドバーのタブ
+    const pcTabs = document.querySelector('#sidebar .maker-tabs');
+    if (pcTabs) {
+      pcTabs.innerHTML = '';
+      makerKeys.forEach(key => {
+        const maker = FRAME_DATA.makers[key];
+        const btn = document.createElement('button');
+        btn.className = 'maker-tab' + (key === currentMaker ? ' active' : '');
+        btn.dataset.maker = key;
+        btn.innerHTML = `<span class="maker-tab-dot" style="background: ${maker.categories[0]?.outerStroke || '#000'}"></span>${maker.name}`;
+        pcTabs.appendChild(btn);
+      });
+    }
+
+    // モバイル用タブ
+    const mobileTabs = document.querySelector('#mobile-panel-content .border-b');
+    if (mobileTabs) {
+      mobileTabs.innerHTML = '';
+      makerKeys.forEach(key => {
+        const maker = FRAME_DATA.makers[key];
+        const btn = document.createElement('button');
+        btn.className = 'maker-tab' + (key === currentMaker ? ' active' : '');
+        btn.dataset.maker = key;
+        btn.textContent = maker.name;
+        mobileTabs.appendChild(btn);
+      });
+    }
+  }
+
   // === メーカータブ切り替え ===
   function _setupMakerTabs() {
     document.querySelectorAll('.maker-tab').forEach(tab => {
@@ -96,39 +153,65 @@
     const maker = FRAME_DATA.makers[makerKey];
     if (!maker) return;
 
+    // カテゴリは1つだけ（カテゴリ名は表示しない）
+    const cat = maker.categories[0];
+    if (!cat) return;
+    const stamps = cat.stamps;
+
+    // 図形表示の基準サイズ計算
+    const maxDim = Math.max(...stamps.map(s => Math.max(s.width, s.height)));
+    const SHAPE_MAX_PX = 48; // 最大48px
+    const scale = SHAPE_MAX_PX / maxDim;
+
     // PC用サイドバー
     const pcContainer = document.getElementById('stamp-list');
     if (pcContainer) {
       pcContainer.innerHTML = '';
 
-      maker.categories.forEach(cat => {
-        const section = document.createElement('div');
-        section.className = 'stamp-category';
-
-        const nameEl = document.createElement('div');
-        nameEl.className = 'stamp-category-name';
-        nameEl.textContent = cat.name;
-        section.appendChild(nameEl);
-
-        const grid = document.createElement('div');
-        grid.className = 'stamp-grid';
-
-        cat.stamps.forEach(stamp => {
-          const btn = document.createElement('button');
-          btn.className = 'stamp-btn';
-          btn.innerHTML = `<span class="stamp-id">${stamp.id}</span><span class="stamp-size">${stamp.width}x${stamp.height}</span>`;
-
-          // 外枠色をトップバーに反映
-          btn.style.setProperty('--accent', cat.outerStroke);
-          btn.style.cssText += `border-top: 2px solid ${cat.outerStroke};`;
-
-          _setupStampBtn(btn, stamp, cat);
-          grid.appendChild(btn);
+      // 表示切替ボタン
+      const toggleWrap = document.createElement('div');
+      toggleWrap.className = 'stamp-view-toggle';
+      toggleWrap.innerHTML = `
+        <button class="stamp-view-btn ${stampViewMode === 'shape' ? 'active' : ''}" data-mode="shape" title="図形表示">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><rect x="3" y="3" width="14" height="14" rx="2"/></svg>
+        </button>
+        <button class="stamp-view-btn ${stampViewMode === 'text' ? 'active' : ''}" data-mode="text" title="テキスト表示">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h8a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
+        </button>
+      `;
+      toggleWrap.querySelectorAll('.stamp-view-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          stampViewMode = btn.dataset.mode;
+          _renderStampList(currentMaker);
         });
-
-        section.appendChild(grid);
-        pcContainer.appendChild(section);
       });
+      pcContainer.appendChild(toggleWrap);
+
+      const grid = document.createElement('div');
+      grid.className = stampViewMode === 'shape' ? 'stamp-grid stamp-grid-shape' : 'stamp-grid';
+
+      stamps.forEach(stamp => {
+        const btn = document.createElement('button');
+        btn.className = 'stamp-btn' + (stampViewMode === 'shape' ? ' stamp-btn-shape' : '');
+        btn.style.cssText = `border-top: 2px solid ${cat.outerStroke};`;
+
+        if (stampViewMode === 'shape') {
+          const w = Math.round(stamp.width * scale);
+          const h = Math.round(stamp.height * scale);
+          btn.innerHTML = `
+            <div class="stamp-shape" style="width:${w}px;height:${h}px;"></div>
+            <span class="stamp-id">${stamp.id}</span>
+            <span class="stamp-size">${stamp.width}x${stamp.height}</span>
+          `;
+        } else {
+          btn.innerHTML = `<span class="stamp-id">${stamp.id}</span><span class="stamp-size">${stamp.width}x${stamp.height}</span>`;
+        }
+
+        _setupStampBtn(btn, stamp, cat);
+        grid.appendChild(btn);
+      });
+
+      pcContainer.appendChild(grid);
     }
 
     // モバイル用
@@ -136,26 +219,19 @@
     if (mobileContainer) {
       mobileContainer.innerHTML = '';
 
-      maker.categories.forEach(cat => {
-        const label = document.createElement('div');
-        label.className = 'text-xs text-gray-500 font-semibold mb-1';
-        label.textContent = cat.name;
-        mobileContainer.appendChild(label);
+      const scroll = document.createElement('div');
+      scroll.className = 'mobile-stamp-scroll mb-2';
 
-        const scroll = document.createElement('div');
-        scroll.className = 'mobile-stamp-scroll mb-2';
-
-        cat.stamps.forEach(stamp => {
-          const btn = document.createElement('button');
-          btn.className = 'stamp-btn';
-          btn.innerHTML = `<span class="stamp-id">${stamp.id}</span><span class="stamp-size">${stamp.width}x${stamp.height}</span>`;
-          btn.style.cssText += `border-top: 2px solid ${cat.outerStroke};`;
-          _setupStampBtn(btn, stamp, cat);
-          scroll.appendChild(btn);
-        });
-
-        mobileContainer.appendChild(scroll);
+      stamps.forEach(stamp => {
+        const btn = document.createElement('button');
+        btn.className = 'stamp-btn';
+        btn.innerHTML = `<span class="stamp-id">${stamp.id}</span><span class="stamp-size">${stamp.width}x${stamp.height}</span>`;
+        btn.style.cssText = `border-top: 2px solid ${cat.outerStroke};`;
+        _setupStampBtn(btn, stamp, cat);
+        scroll.appendChild(btn);
       });
+
+      mobileContainer.appendChild(scroll);
     }
   }
 
@@ -705,10 +781,38 @@
     canvas.requestRenderAll();
 
     // 入力欄の変更をキャンバスに反映
-    input.addEventListener('input', () => {
+    const syncTitle = () => {
       titleText.set('text', input.value || '入稿データ');
       canvas.requestRenderAll();
-    });
+    };
+    input.addEventListener('input', syncTitle);
+
+    // タイトルにテキストを追記するヘルパー
+    function appendToTitle(text) {
+      if (input.value && input.value.trim()) {
+        input.value += ' ' + text;
+      } else {
+        input.value = text;
+      }
+      syncTitle();
+    }
+
+    // 「はんこどり」ボタン
+    const btnHankodori = document.getElementById('title-btn-hankodori');
+    if (btnHankodori) {
+      btnHankodori.addEventListener('click', () => appendToTitle('はんこどり'));
+    }
+
+    // 「新作」ボタン（年月ドロップダウンの値を使う）
+    const btnShinsaku = document.getElementById('title-btn-shinsaku');
+    const yearSelect = document.getElementById('title-year');
+    const monthSelect = document.getElementById('title-month');
+    if (btnShinsaku && yearSelect && monthSelect) {
+      btnShinsaku.addEventListener('click', () => {
+        const text = `${yearSelect.value}年${monthSelect.value}月新作`;
+        appendToTitle(text);
+      });
+    }
   }
 
   // === 保存/読込 ===

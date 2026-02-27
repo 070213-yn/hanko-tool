@@ -57,6 +57,26 @@
           <div class="title-input-wrap">
             <label class="text-[10px] text-gray-400 font-medium">タイトル:</label>
             <input id="title-input" type="text" value="入稿データ" placeholder="入稿データ" class="title-input">
+            <div class="title-quick-btns">
+              <button id="title-btn-hankodori" class="title-quick-btn">はんこどり</button>
+              <div class="title-quick-group">
+                <select id="title-year" class="title-quick-select">
+                  <option value="2025">2025</option>
+                  <option value="2026" selected>2026</option>
+                  <option value="2027">2027</option>
+                  <option value="2028">2028</option>
+                </select>
+                <span class="title-quick-label">年</span>
+                <select id="title-month" class="title-quick-select">
+                  <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                  <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                  <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                  <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+                </select>
+                <span class="title-quick-label">月</span>
+                <button id="title-btn-shinsaku" class="title-quick-btn">新作</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -372,6 +392,7 @@
   <script src="js/image-placer.js"></script>
   <script src="js/history-manager.js"></script>
   <script src="js/storage-manager.js"></script>
+  <script src="js/sheet-fetcher.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

@@ -2,18 +2,18 @@
 // すべてのサイズはmm単位
 
 const FRAME_DATA = {
-  // メーカー定義
+  // メーカー定義（カテゴリなし: 1メーカー = 1スタイル + スタンプ配列）
   makers: {
     karafuruya: {
       name: 'からふるや',
       categories: [
         {
-          name: '天然木（メープル）',
-          outerStroke: '#000000',       // 黒実線
-          outerStrokeDash: [],          // 実線
-          innerStroke: '#FF0000',       // 赤破線
-          innerStrokeDash: [2, 2],      // 破線パターン
-          margin: 2,                     // 外枠と内枠の差（片側mm）
+          name: 'からふるや',
+          outerStroke: '#000000',
+          outerStrokeDash: [],
+          innerStroke: '#FF0000',
+          innerStrokeDash: [2, 2],
+          margin: 2,
           labelColor: '#000000',
           stamps: [
             { id: 'A1', width: 26, height: 30 },
@@ -35,20 +35,9 @@ const FRAME_DATA = {
             { id: 'S9', width: 27, height: 7 },
             { id: 'R',  width: 30, height: 30 },
             { id: 'S',  width: 20, height: 20 },
-          ]
-        },
-        {
-          name: 'MDF',
-          outerStroke: '#008000',       // 緑実線
-          outerStrokeDash: [],          // 実線
-          innerStroke: '#FF0000',       // 赤破線
-          innerStrokeDash: [2, 2],      // 破線パターン
-          margin: 1,                     // 外枠と内枠の差（片側mm）
-          labelColor: '#008000',
-          stamps: [
-            { id: 'X', width: 12, height: 27 },
-            { id: 'Y', width: 10, height: 10 },
-            { id: 'Z', width: 15, height: 15 },
+            { id: 'X',  width: 12, height: 27 },
+            { id: 'Y',  width: 10, height: 10 },
+            { id: 'Z',  width: 15, height: 15 },
           ]
         }
       ]
@@ -57,12 +46,12 @@ const FRAME_DATA = {
       name: 'ヤマダ',
       categories: [
         {
-          name: 'スタンダード',
-          outerStroke: '#000000',       // 黒実線
-          outerStrokeDash: [],          // 実線
-          innerStroke: '#FF0000',       // 赤破線
-          innerStrokeDash: [2, 2],      // 破線パターン
-          margin: 1,                     // 外枠と内枠の差（片側mm）
+          name: 'ヤマダ',
+          outerStroke: '#000000',
+          outerStrokeDash: [],
+          innerStroke: '#FF0000',
+          innerStrokeDash: [2, 2],
+          margin: 1,
           labelColor: '#000000',
           stamps: [
             { id: 'YM1',  width: 12, height: 12 },
@@ -94,7 +83,68 @@ const FRAME_DATA = {
 
   // エクスポート設定
   EXPORT_DPI: 1200,
-  // 1200DPI時の A4 ピクセルサイズ
-  get EXPORT_WIDTH_PX() { return Math.round(this.A4_WIDTH / 25.4 * this.EXPORT_DPI); },  // 9921
-  get EXPORT_HEIGHT_PX() { return Math.round(this.A4_HEIGHT / 25.4 * this.EXPORT_DPI); }, // 14031
+  get EXPORT_WIDTH_PX() { return Math.round(this.A4_WIDTH / 25.4 * this.EXPORT_DPI); },
+  get EXPORT_HEIGHT_PX() { return Math.round(this.A4_HEIGHT / 25.4 * this.EXPORT_DPI); },
+
+  // Googleスプレッドシート連携用
+  sheetId: '1K6aqI79ZdEvCp0CMpi9eUzlxUl3ub5eWGThDadRaQj0',
+
+  // シート名 → メーカーキーのマッピング
+  // シート名（タブ名）がメーカー名に対応する
+  sheetMakers: [
+    { key: 'karafuruya', sheetName: 'からふるや' },
+    { key: 'yamada', sheetName: 'ヤマダ' },
+  ],
+
+  // メーカーごとの枠線スタイル定義（スプレッドシートには載せない設定値）
+  makerStyles: {
+    'からふるや': {
+      outerStroke: '#000000', outerStrokeDash: [],
+      innerStroke: '#FF0000', innerStrokeDash: [2, 2],
+      margin: 2, labelColor: '#000000',
+    },
+    'ヤマダ': {
+      outerStroke: '#000000', outerStrokeDash: [],
+      innerStroke: '#FF0000', innerStrokeDash: [2, 2],
+      margin: 1, labelColor: '#000000',
+    },
+    '_default': {
+      outerStroke: '#333333', outerStrokeDash: [],
+      innerStroke: '#FF0000', innerStrokeDash: [2, 2],
+      margin: 2, labelColor: '#333333',
+    },
+  },
+
+  // スプレッドシートのデータからmakersを再構築する
+  // sheetData: { 'メーカーキー': [{ id, width, height }, ...], ... }
+  buildFromSheet(sheetData) {
+    const newMakers = {};
+
+    for (const [makerKey, stamps] of Object.entries(sheetData)) {
+      if (stamps.length === 0) continue;
+
+      // sheetMakersからメーカー名を取得
+      const config = this.sheetMakers.find(m => m.key === makerKey);
+      const makerName = config ? config.sheetName : makerKey;
+
+      // スタイルを取得
+      const style = this.makerStyles[makerName] || this.makerStyles['_default'];
+
+      newMakers[makerKey] = {
+        name: makerName,
+        categories: [{
+          name: makerName,
+          outerStroke: style.outerStroke,
+          outerStrokeDash: [...style.outerStrokeDash],
+          innerStroke: style.innerStroke,
+          innerStrokeDash: [...style.innerStrokeDash],
+          margin: style.margin,
+          labelColor: style.labelColor,
+          stamps: stamps,
+        }]
+      };
+    }
+
+    this.makers = newMakers;
+  },
 };
