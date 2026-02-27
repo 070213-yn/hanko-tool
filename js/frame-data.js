@@ -5,10 +5,10 @@ const FRAME_DATA = {
   // メーカー定義（カテゴリなし: 1メーカー = 1スタイル + スタンプ配列）
   makers: {
     karafuruya: {
-      name: 'からふるや',
+      name: 'からふる屋',
       categories: [
         {
-          name: 'からふるや',
+          name: 'からふる屋',
           outerStroke: '#000000',
           outerStrokeDash: [],
           innerStroke: '#FF0000',
@@ -96,13 +96,13 @@ const FRAME_DATA = {
   // シート名 → メーカーキーのマッピング
   // シート名（タブ名）がメーカー名に対応する
   sheetMakers: [
-    { key: 'karafuruya', sheetName: 'からふるや' },
+    { key: 'karafuruya', sheetName: 'からふる屋' },
     { key: 'yamada', sheetName: 'ヤマダ' },
   ],
 
   // メーカーごとの枠線スタイル定義（スプレッドシートには載せない設定値）
   makerStyles: {
-    'からふるや': {
+    'からふる屋': {
       outerStroke: '#000000', outerStrokeDash: [],
       innerStroke: '#FF0000', innerStrokeDash: [2, 2],
       margin: 2, labelColor: '#000000',

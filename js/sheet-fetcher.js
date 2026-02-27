@@ -7,7 +7,7 @@ class SheetFetcher {
   }
 
   // 全メーカーのデータを取得
-  // sheetMakers: [{ key: 'karafuruya', sheetName: 'からふるや' }, ...]
+  // sheetMakers: [{ key: 'karafuruya', sheetName: 'からふる屋' }, ...]
   // 戻り値: { 'karafuruya': [{ id, width, height }, ...], 'yamada': [...] }
   async fetchAll(sheetMakers) {
     const results = {};
