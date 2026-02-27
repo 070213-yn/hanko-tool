@@ -294,6 +294,77 @@ class ImagePlacer {
     });
   }
 
+  // === 画像を枠の中心に再配置 ===
+  // 枠または画像を選択した状態で呼ぶ
+  centerImageInFrame(selectedObj) {
+    let frame = null;
+    let placement = null;
+
+    if (selectedObj.isStampFrame) {
+      // 枠が選択された場合 → 紐づく画像を探す
+      frame = selectedObj;
+      const uid = this._getFrameUid(frame);
+      placement = this.placements[uid];
+    } else if (selectedObj.isPlacedImage) {
+      // 画像が選択された場合 → 紐づく枠を探す
+      const frameUid = selectedObj._linkedFrameUid;
+      const frames = this.cm.getStampFrames();
+      frame = frames.find(f => f._placerUid === frameUid);
+      if (frame) {
+        placement = this.placements[frameUid];
+      }
+    }
+
+    if (!frame || !placement) return false;
+
+    const fabricImg = placement.fabricImg;
+    const imageData = this.images.find(i => i.id === placement.imageId);
+    if (!imageData) return false;
+
+    // 枠の内枠サイズを計算
+    const category = frame._category;
+    const margin = category.margin;
+    const innerW = frame.stampWidth - margin * 2;
+    const innerH = frame.stampHeight - margin * 2;
+    const imagePadding = 0.5;
+    const imageAreaW = innerW - imagePadding * 2;
+    const imageAreaH = innerH - imagePadding * 2;
+
+    // 描画部分のバウンディングボックスを再検出
+    const bounds = this._detectContentBounds(imageData.element);
+
+    // 配置エリアに収まるスケールを再計算
+    const scaleX = imageAreaW / bounds.width;
+    const scaleY = imageAreaH / bounds.height;
+    const scale = Math.min(scaleX, scaleY);
+
+    // 配置エリアの中心座標
+    const centerX = frame.left + margin + imagePadding + imageAreaW / 2;
+    const centerY = frame.top + margin + imagePadding + imageAreaH / 2;
+
+    // 描画部分の中心を配置エリア中心に合わせる
+    const contentCenterX = bounds.x + bounds.width / 2;
+    const contentCenterY = bounds.y + bounds.height / 2;
+
+    fabricImg.set({
+      scaleX: scale,
+      scaleY: scale,
+      left: centerX - contentCenterX * scale,
+      top: centerY - contentCenterY * scale,
+    });
+
+    // オフセットを再計算
+    fabricImg._offsetFromFrame = {
+      x: fabricImg.left - frame.left,
+      y: fabricImg.top - frame.top,
+    };
+
+    fabricImg.setCoords();
+    fabricImg.dirty = true;
+    this.cm.getCanvas().renderAll();
+    return true;
+  }
+
   // === 枠から画像を外す ===
   removeFromFrame(frame) {
     this._removeImageFromFrame(frame);

@@ -272,6 +272,26 @@
     msg.classList.toggle('hidden', hasFrames);
   }
 
+  // === 画像を枠の中心に移動 ===
+  function _centerImage() {
+    const canvas = canvasManager.getCanvas();
+    const active = canvas.getActiveObject();
+    if (!active) return;
+
+    // 複数選択の場合は各オブジェクトに対して実行
+    const objects = active.getObjects ? active.getObjects() : [active];
+    let success = false;
+    objects.forEach(obj => {
+      if (imagePlacer.centerImageInFrame(obj)) {
+        success = true;
+      }
+    });
+
+    if (success) {
+      historyManager.saveState();
+    }
+  }
+
   // === 整列ボタン ===
   function _setupAlignButtons() {
     document.querySelectorAll('[data-align]').forEach(btn => {
@@ -319,6 +339,16 @@
       gridToggle.addEventListener('change', () => {
         canvasManager.toggleGrid();
       });
+    }
+
+    // 画像を枠の中心に移動
+    const btnCenter = document.getElementById('btn-center-image');
+    if (btnCenter) {
+      btnCenter.addEventListener('click', _centerImage);
+    }
+    const mobileBtnCenter = document.getElementById('mobile-btn-center');
+    if (mobileBtnCenter) {
+      mobileBtnCenter.addEventListener('click', _centerImage);
     }
 
     // 回転（縦横切替）
