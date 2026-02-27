@@ -275,6 +275,7 @@ class ImagePlacer {
       imageId: imageData.id,
       fabricImg: fabricImg,
       clipRect: clipRect,
+      placementTime: Date.now(),
     };
 
     // 画像の配置状態を更新

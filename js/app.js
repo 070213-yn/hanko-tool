@@ -935,7 +935,8 @@
         const prefix = document.getElementById('title-prefix')?.value || '';
         const year = document.getElementById('title-year')?.value || '';
         const month = document.getElementById('title-month')?.value || '';
-        const parts = [prefix, maker, `${year}年${month}月新作`];
+        const day = document.getElementById('title-day')?.value || '1';
+        const parts = [maker, prefix, `${year}年${month}月${day}日`];
         input.value = parts.join('_');
         syncTitle();
       });

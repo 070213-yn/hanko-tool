@@ -1,4 +1,5 @@
 // 1200DPI PNGエクスポート・PSDエクスポート（コンテンツ領域トリミング対応）
+// iPad DPI制限対策: iOS上限超え時はPNG分割ダウンロード、PSD分割レイヤー
 
 class Exporter {
   constructor(canvasManager) {
@@ -19,23 +20,9 @@ class Exporter {
     return 268435456; // デスクトップ: 16384x16384
   }
 
-  // エクスポート倍率を計算（bounds指定時はトリミング領域で判定）
-  _getExportMultiplier(bounds) {
-    const baseMult = FRAME_DATA.EXPORT_WIDTH_PX / FRAME_DATA.A4_WIDTH; // 1200DPI
-    const w = bounds ? bounds.width : FRAME_DATA.A4_WIDTH;
-    const h = bounds ? bounds.height : FRAME_DATA.A4_HEIGHT;
-    const targetW = Math.round(w * baseMult);
-    const targetH = Math.round(h * baseMult);
-    const targetPixels = targetW * targetH;
-    const maxPixels = this._getMaxCanvasPixels();
-
-    if (targetPixels <= maxPixels) {
-      return baseMult;
-    }
-
-    // 収まるように縮小
-    const scale = Math.sqrt(maxPixels / targetPixels);
-    return baseMult * scale;
+  // 常に1200DPIの倍率を返す（DPI縮小は行わない）
+  _getFullMultiplier() {
+    return FRAME_DATA.EXPORT_WIDTH_PX / FRAME_DATA.A4_WIDTH;
   }
 
   // コンテンツ領域のバウンディングボックスを計算（mm単位）
@@ -93,7 +80,7 @@ class Exporter {
     return `${title}.${ext}`;
   }
 
-  // PNG エクスポート（コンテンツ領域にトリミング）
+  // === PNG エクスポート（1200DPI固定、iOS上限超え時は分割ダウンロード） ===
   async exportPNG() {
     const canvas = this.cm.getCanvas();
     const bounds = this._getContentBounds();
@@ -103,35 +90,32 @@ class Exporter {
       return;
     }
 
-    const multiplier = this._getExportMultiplier(bounds);
+    const multiplier = this._getFullMultiplier(); // 常に1200DPI
+    const outputW = Math.round(bounds.width * multiplier);
+    const outputH = Math.round(bounds.height * multiplier);
+    const maxPixels = this._getMaxCanvasPixels();
+
+    if (outputW * outputH <= maxPixels) {
+      // 上限内 → 従来通り一括エクスポート
+      return this._exportPNGSingle(bounds, multiplier);
+    }
+
+    // iOS上限超え → ストリップ分割エクスポート
+    return this._exportPNGTiled(bounds, multiplier, maxPixels);
+  }
+
+  // 一括PNGエクスポート（上限内の場合）
+  async _exportPNGSingle(bounds, multiplier) {
+    const canvas = this.cm.getCanvas();
     const outputW = Math.round(bounds.width * multiplier);
     const outputH = Math.round(bounds.height * multiplier);
     const actualDPI = Math.round(multiplier * 25.4);
 
-    // ローディング表示
     this._showLoading(`PNG書出し中... (${outputW}x${outputH}px, ${actualDPI}DPI)`);
     await this._sleep(100);
 
     try {
-      // エクスポートに含めないオブジェクトを一時非表示（グリッド等）
-      const hiddenObjects = [];
-      canvas.getObjects().forEach(obj => {
-        if (obj.excludeFromExport || obj.isGrid) {
-          obj.set({ visible: false });
-          hiddenObjects.push(obj);
-        }
-      });
-
-      // グリッドを一時非表示
-      const gridWasVisible = this.cm.gridVisible;
-      if (gridWasVisible) {
-        this.cm.gridLines.forEach(l => l.set({ visible: false }));
-      }
-
-      // ビューポートを一時的にリセット
-      const origVpt = canvas.viewportTransform.slice();
-      canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
-      canvas.renderAll();
+      const { hiddenObjects, gridWasVisible, origVpt } = this._prepareExport(canvas);
 
       const dataURL = canvas.toDataURL({
         format: 'png',
@@ -142,29 +126,98 @@ class Exporter {
         height: bounds.height,
       });
 
-      // ビューポートを復元
-      canvas.viewportTransform = origVpt;
+      this._restoreExport(canvas, hiddenObjects, gridWasVisible, origVpt);
 
-      // 非表示にしたオブジェクトを復元
-      hiddenObjects.forEach(obj => obj.set({ visible: true }));
-
-      if (gridWasVisible) {
-        this.cm.gridLines.forEach(l => l.set({ visible: true }));
-      }
-      canvas.requestRenderAll();
-
-      // ダウンロード
       this._downloadDataURL(dataURL, this._getFileName('png'));
-
-      if (actualDPI < FRAME_DATA.EXPORT_DPI) {
-        alert(`デバイスの制限により、${actualDPI}DPIで出力しました（推奨: ${FRAME_DATA.EXPORT_DPI}DPI）。\nPC版のChromeで開くと1200DPIで出力できます。`);
-      }
     } catch (e) {
       console.error('PNGエクスポートエラー:', e);
       alert('PNGエクスポートに失敗しました。');
     } finally {
       this._hideLoading();
     }
+  }
+
+  // 分割PNGエクスポート（iOS上限超えの場合）
+  async _exportPNGTiled(bounds, multiplier, maxPixels) {
+    const canvas = this.cm.getCanvas();
+    const outputW = Math.round(bounds.width * multiplier);
+    const actualDPI = Math.round(multiplier * 25.4);
+
+    // ストリップ高さを計算（ピクセル単位で上限内に収まる高さ）
+    const stripHpx = Math.floor(maxPixels / outputW);
+    const stripHmm = stripHpx / multiplier; // mm単位
+    const totalHmm = bounds.height;
+    const numStrips = Math.ceil(totalHmm / stripHmm);
+
+    this._showLoading(`PNG分割書出し中... (${numStrips}枚, ${actualDPI}DPI)`);
+    await this._sleep(100);
+
+    alert(`iPadの制限により、${numStrips}枚のPNGに分割して${actualDPI}DPIで出力します。\nPC上で結合してください。`);
+
+    try {
+      const { hiddenObjects, gridWasVisible, origVpt } = this._prepareExport(canvas);
+
+      for (let i = 0; i < numStrips; i++) {
+        const y = bounds.top + i * stripHmm;
+        const h = Math.min(stripHmm, totalHmm - i * stripHmm);
+
+        this._showLoading(`PNG分割書出し中... (${i + 1}/${numStrips}枚)`);
+
+        const dataURL = canvas.toDataURL({
+          format: 'png',
+          multiplier: multiplier,
+          left: bounds.left,
+          top: y,
+          width: bounds.width,
+          height: h,
+        });
+
+        const filename = this._getFileName('png').replace('.png', `_${i + 1}of${numStrips}.png`);
+        this._downloadDataURL(dataURL, filename);
+
+        // ブラウザが複数ダウンロードを処理する間隔
+        await this._sleep(500);
+      }
+
+      this._restoreExport(canvas, hiddenObjects, gridWasVisible, origVpt);
+    } catch (e) {
+      console.error('PNG分割エクスポートエラー:', e);
+      alert('PNG分割エクスポートに失敗しました。');
+    } finally {
+      this._hideLoading();
+    }
+  }
+
+  // エクスポート前の共通準備（非表示オブジェクト、ビューポートリセット）
+  _prepareExport(canvas) {
+    const hiddenObjects = [];
+    canvas.getObjects().forEach(obj => {
+      if (obj.excludeFromExport || obj.isGrid) {
+        obj.set({ visible: false });
+        hiddenObjects.push(obj);
+      }
+    });
+
+    const gridWasVisible = this.cm.gridVisible;
+    if (gridWasVisible) {
+      this.cm.gridLines.forEach(l => l.set({ visible: false }));
+    }
+
+    const origVpt = canvas.viewportTransform.slice();
+    canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
+    canvas.renderAll();
+
+    return { hiddenObjects, gridWasVisible, origVpt };
+  }
+
+  // エクスポート後の復元
+  _restoreExport(canvas, hiddenObjects, gridWasVisible, origVpt) {
+    canvas.viewportTransform = origVpt;
+    hiddenObjects.forEach(obj => obj.set({ visible: true }));
+    if (gridWasVisible) {
+      this.cm.gridLines.forEach(l => l.set({ visible: true }));
+    }
+    canvas.requestRenderAll();
   }
 
   // SVG エクスポート
@@ -248,7 +301,7 @@ class Exporter {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // PSD エクスポート（レイヤー分け・コンテンツ領域にトリミング）
+  // === PSD エクスポート（1200DPI固定、iOS上限超え時はレイヤー分割） ===
   async exportPSD() {
     if (typeof agPsd === 'undefined') {
       alert('PSDライブラリの読み込みに失敗しました。ページを再読み込みしてください。');
@@ -264,37 +317,64 @@ class Exporter {
     const bounds = this._getContentBounds();
     if (!bounds) return;
 
-    const multiplier = this._getExportMultiplier(bounds);
+    const multiplier = this._getFullMultiplier(); // 常に1200DPI
     const outputW = Math.round(bounds.width * multiplier);
     const outputH = Math.round(bounds.height * multiplier);
     const actualDPI = Math.round(multiplier * 25.4);
+    const maxPixels = this._getMaxCanvasPixels();
 
     // トリミングオフセット（ピクセル単位）
     const offsetX = bounds.left * multiplier;
     const offsetY = bounds.top * multiplier;
+
+    // 大きなキャンバスかどうか判定
+    const isLargeCanvas = (outputW * outputH) > maxPixels;
 
     this._showLoading(`PSD書出し中... (${outputW}x${outputH}px, ${actualDPI}DPI)`);
     await this._sleep(100);
 
     try {
       const psdLayers = [];
-
-      // 背景レイヤー（白）
-      const bgCanvas = document.createElement('canvas');
-      bgCanvas.width = outputW;
-      bgCanvas.height = outputH;
-      const bgCtx = bgCanvas.getContext('2d');
-      bgCtx.fillStyle = '#FFFFFF';
-      bgCtx.fillRect(0, 0, outputW, outputH);
-      psdLayers.push({
-        name: '背景',
-        canvas: bgCanvas,
-        left: 0,
-        top: 0,
-      });
-
-      // タイトルレイヤー
       const canvas = this.cm.getCanvas();
+
+      // === 背景レイヤー ===
+      if (isLargeCanvas) {
+        // iOS上限超え: 背景をストリップ分割
+        const bgStripH = Math.floor(maxPixels / outputW);
+        let stripIdx = 1;
+        for (let y = 0; y < outputH; y += bgStripH) {
+          const h = Math.min(bgStripH, outputH - y);
+          const bgCanvas = document.createElement('canvas');
+          bgCanvas.width = outputW;
+          bgCanvas.height = h;
+          const bgCtx = bgCanvas.getContext('2d');
+          bgCtx.fillStyle = '#FFFFFF';
+          bgCtx.fillRect(0, 0, outputW, h);
+          psdLayers.push({
+            name: `背景_${stripIdx}`,
+            canvas: bgCanvas,
+            left: 0,
+            top: y,
+          });
+          stripIdx++;
+        }
+      } else {
+        // 上限内: 一括背景
+        const bgCanvas = document.createElement('canvas');
+        bgCanvas.width = outputW;
+        bgCanvas.height = outputH;
+        const bgCtx = bgCanvas.getContext('2d');
+        bgCtx.fillStyle = '#FFFFFF';
+        bgCtx.fillRect(0, 0, outputW, outputH);
+        psdLayers.push({
+          name: '背景',
+          canvas: bgCanvas,
+          left: 0,
+          top: 0,
+        });
+      }
+
+      // === タイトルレイヤー ===
       const titleObj = canvas.getObjects().find(o => o.isTitleText);
       if (titleObj && titleObj.text) {
         const fontSize = Math.round(5 * multiplier);
@@ -318,7 +398,7 @@ class Exporter {
         });
       }
 
-      // 配置画像を個別レイヤーとして追加
+      // === 配置画像を個別レイヤーとして追加 ===
       frames.forEach(frame => {
         if (window.imagePlacer) {
           const uid = window.imagePlacer._getFrameUid(frame);
@@ -337,24 +417,54 @@ class Exporter {
         }
       });
 
-      // 全枠線を1枚のレイヤーにまとめて描画
-      const allFramesResult = this._renderAllFrameLines(frames, multiplier);
-      psdLayers.push({
-        name: '枠線（全体）',
-        canvas: allFramesResult.canvas,
-        left: allFramesResult.left - Math.round(offsetX),
-        top: allFramesResult.top - Math.round(offsetY),
-      });
-
-      // サイズ表記・メモレイヤー
-      const labelsResult = this._renderLabels(frames, multiplier);
-      if (labelsResult) {
-        psdLayers.push({
-          name: 'サイズ表記・メモ',
-          canvas: labelsResult.canvas,
-          left: labelsResult.left - Math.round(offsetX),
-          top: labelsResult.top - Math.round(offsetY),
+      // === 枠線レイヤー ===
+      if (isLargeCanvas) {
+        // iOS上限超え: 枠線を個別レイヤーに分割
+        frames.forEach(frame => {
+          const result = this._renderFrameLines(frame, multiplier);
+          psdLayers.push({
+            name: '枠線 - ' + frame.stampId,
+            canvas: result.canvas,
+            left: result.left - Math.round(offsetX),
+            top: result.top - Math.round(offsetY),
+          });
         });
+      } else {
+        // 上限内: 全枠線を1枚のレイヤーにまとめて描画
+        const allFramesResult = this._renderAllFrameLines(frames, multiplier);
+        psdLayers.push({
+          name: '枠線（全体）',
+          canvas: allFramesResult.canvas,
+          left: allFramesResult.left - Math.round(offsetX),
+          top: allFramesResult.top - Math.round(offsetY),
+        });
+      }
+
+      // === サイズ表記・メモレイヤー ===
+      if (isLargeCanvas) {
+        // iOS上限超え: 枠ごとに個別レイヤー
+        frames.forEach(frame => {
+          const labelResult = this._renderLabelSingle(frame, multiplier);
+          if (labelResult) {
+            psdLayers.push({
+              name: 'ラベル - ' + frame.stampId,
+              canvas: labelResult.canvas,
+              left: labelResult.left - Math.round(offsetX),
+              top: labelResult.top - Math.round(offsetY),
+            });
+          }
+        });
+      } else {
+        // 上限内: まとめて描画
+        const labelsResult = this._renderLabels(frames, multiplier);
+        if (labelsResult) {
+          psdLayers.push({
+            name: 'サイズ表記・メモ',
+            canvas: labelsResult.canvas,
+            left: labelsResult.left - Math.round(offsetX),
+            top: labelsResult.top - Math.round(offsetY),
+          });
+        }
       }
 
       const psd = {
@@ -379,9 +489,6 @@ class Exporter {
       this._downloadURL(url, this._getFileName('psd'));
       URL.revokeObjectURL(url);
 
-      if (actualDPI < FRAME_DATA.EXPORT_DPI) {
-        alert('デバイスの制限により、' + actualDPI + 'DPIで出力しました（推奨: ' + FRAME_DATA.EXPORT_DPI + 'DPI）。\nPC版のChromeで開くと1200DPIで出力できます。');
-      }
     } catch (e) {
       console.error('PSDエクスポートエラー:', e);
       alert('PSDエクスポートに失敗しました。\n' + e.message);
@@ -472,7 +579,7 @@ class Exporter {
     return { canvas: c, left: canvasLeft, top: canvasTop };
   }
 
-  // サイズ表記・メモテキストをオフスクリーンCanvasにレンダリング
+  // サイズ表記・メモテキストをオフスクリーンCanvasにレンダリング（全枠まとめて）
   _renderLabels(frames, multiplier) {
     if (frames.length === 0) return null;
 
@@ -530,7 +637,51 @@ class Exporter {
     return { canvas: c, left: canvasLeft, top: canvasTop };
   }
 
-  // 枠線をオフスクリーンCanvasにレンダリング（単体用、互換性のため残す）
+  // サイズ表記・メモテキストを1枠分だけレンダリング（分割用）
+  _renderLabelSingle(frame, multiplier) {
+    const category = frame._category;
+    const fw = frame.stampWidth * multiplier;
+    const fh = frame.stampHeight * multiplier;
+    const labelH = 4 * multiplier; // ラベル分の高さ
+
+    const w = Math.ceil(fw);
+    const h = Math.ceil(fh + labelH);
+
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext('2d');
+
+    // サイズ表記（右下外側、右揃え）
+    const sizeText = `${frame.stampId} ${frame.stampWidth}\u00D7${frame.stampHeight}`;
+    const sizeFontSize = Math.round(2.5 * multiplier);
+    ctx.font = `500 ${sizeFontSize}px sans-serif`;
+    ctx.fillStyle = category.labelColor;
+    ctx.globalAlpha = 0.55;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText(sizeText, fw, fh + 0.3 * multiplier);
+
+    // メモ（左下外側、左揃え）
+    const memo = frame.stampMemo || '';
+    if (memo) {
+      const memoFontSize = Math.round(2.2 * multiplier);
+      ctx.font = `400 ${memoFontSize}px sans-serif`;
+      ctx.fillStyle = '#6366f1';
+      ctx.globalAlpha = 0.7;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(memo, 0, fh + 0.3 * multiplier);
+    }
+
+    return {
+      canvas: c,
+      left: Math.round(frame.left * multiplier),
+      top: Math.round(frame.top * multiplier),
+    };
+  }
+
+  // 枠線をオフスクリーンCanvasにレンダリング（単体用）
   _renderFrameLines(frame, multiplier) {
     const category = frame._category;
     const w = Math.ceil(frame.stampWidth * multiplier);

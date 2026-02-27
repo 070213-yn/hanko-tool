@@ -355,6 +355,16 @@ class FrameFactory {
 
     const newFrames = [];
     frames.forEach(frame => {
+      // 配置済み画像情報を保存（元の枠から切り離さずにコピー用の情報だけ取得）
+      let placementInfo = null;
+      if (window.imagePlacer) {
+        const uid = window.imagePlacer._getFrameUid(frame);
+        const placement = window.imagePlacer.placements[uid];
+        if (placement) {
+          placementInfo = { imageId: placement.imageId };
+        }
+      }
+
       const stamp = {
         id: frame.stampId,
         width: frame.stampWidth,
@@ -363,6 +373,12 @@ class FrameFactory {
       const cat = frame._category;
       // 自動配置位置に新しい枠を作成（posOverrideなし）
       const newFrame = this.createFrame(stamp, cat);
+
+      // 画像を新しい枠にも配置（元の枠の画像はそのまま残す）
+      if (window.imagePlacer && placementInfo) {
+        window.imagePlacer.restorePlacement(newFrame, placementInfo);
+      }
+
       newFrames.push(newFrame);
     });
 
