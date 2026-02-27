@@ -232,13 +232,31 @@ class FrameFactory {
 
     // 各枠を再配置
     frames.forEach(frame => {
+      const oldLeft = frame.left;
+      const oldTop = frame.top;
       const pos = this._getNextPosition(frame.stampWidth, frame.stampHeight);
       frame.set({ left: pos.x, top: pos.y });
       frame.setCoords();
 
-      // 配置済み画像を追従させる
+      // 配置済み画像をフレームと同じ距離だけ移動
       if (window.imagePlacer) {
-        window.imagePlacer._syncImageToFrame(frame);
+        const dx = pos.x - oldLeft;
+        const dy = pos.y - oldTop;
+        if (dx !== 0 || dy !== 0) {
+          const uid = window.imagePlacer._getFrameUid(frame);
+          const placement = window.imagePlacer.placements[uid];
+          if (placement) {
+            placement.fabricImg.set({
+              left: placement.fabricImg.left + dx,
+              top: placement.fabricImg.top + dy,
+            });
+            placement.clipRect.set({
+              left: placement.clipRect.left + dx,
+              top: placement.clipRect.top + dy,
+            });
+            placement.fabricImg.setCoords();
+          }
+        }
       }
     });
 
