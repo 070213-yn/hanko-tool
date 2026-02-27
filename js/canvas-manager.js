@@ -340,6 +340,11 @@ class CanvasManager {
     return this.canvas.getObjects().filter(o => o.isStampFrame);
   }
 
+  // 配置済み画像オブジェクトを取得
+  getPlacedImages() {
+    return this.canvas.getObjects().filter(o => o.isPlacedImage);
+  }
+
   getCanvas() {
     return this.canvas;
   }

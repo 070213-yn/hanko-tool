@@ -149,8 +149,8 @@
         <div class="controls-divider"></div>
         <div class="flex items-center gap-2 flex-wrap">
           <label class="text-xs font-medium text-gray-500 whitespace-nowrap">ノイズ除去:</label>
-          <input type="range" id="noise-${imageObj.id}" min="1" max="200" value="${imageObj.noiseSize}"
-                 class="w-20 cursor-pointer noise-slider">
+          <input type="range" id="noise-${imageObj.id}" min="0" max="50" value="${imageObj.noiseSize}"
+                 class="cursor-pointer noise-slider">
           <span id="noise-val-${imageObj.id}" class="text-xs font-mono text-gray-500 w-10 text-right">${imageObj.noiseSize}px</span>
         </div>
         <div class="controls-divider"></div>
@@ -494,11 +494,14 @@
       return;
     }
 
-    // 全画像のpreviewCanvasをdataURLに変換
-    const items = images.map(img => ({
-      name: _makeFileName(img.fileName),
-      dataURL: img.previewCanvas.toDataURL('image/png'),
-    }));
+    // 全画像のpreviewCanvasをトリミングしてdataURLに変換
+    const items = images.map(img => {
+      const trimmed = _trimTransparent(img.previewCanvas);
+      return {
+        name: _makeFileName(img.fileName),
+        dataURL: trimmed.toDataURL('image/png'),
+      };
+    });
 
     try {
       const json = JSON.stringify(items);
@@ -513,7 +516,8 @@
   // === ダウンロード ===
 
   function _downloadSingle(imageObj) {
-    const dataURL = imageObj.previewCanvas.toDataURL('image/png');
+    const trimmed = _trimTransparent(imageObj.previewCanvas);
+    const dataURL = trimmed.toDataURL('image/png');
     const link = document.createElement('a');
     link.download = _makeFileName(imageObj.fileName);
     link.href = dataURL;
@@ -532,7 +536,8 @@
     try {
       const zip = new JSZip();
       for (const img of images) {
-        const blob = await new Promise(resolve => img.previewCanvas.toBlob(resolve, 'image/png'));
+        const trimmed = _trimTransparent(img.previewCanvas);
+        const blob = await new Promise(resolve => trimmed.toBlob(resolve, 'image/png'));
         zip.file(_makeFileName(img.fileName), blob);
       }
       const content = await zip.generateAsync({ type: 'blob' });
@@ -560,6 +565,42 @@
   function _makeFileName(originalName) {
     const baseName = originalName.replace(/\.[^.]+$/, '');
     return `${baseName}_二値化.png`;
+  }
+
+  // === 透明部分をトリミング（描画部分だけの最小キャンバスを返す） ===
+  function _trimTransparent(sourceCanvas) {
+    const w = sourceCanvas.width;
+    const h = sourceCanvas.height;
+    const ctx = sourceCanvas.getContext('2d');
+    const data = ctx.getImageData(0, 0, w, h).data;
+
+    let minX = w, minY = h, maxX = 0, maxY = 0;
+    let hasContent = false;
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const alpha = data[(y * w + x) * 4 + 3];
+        if (alpha > 0) {
+          hasContent = true;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    // 描画部分がなければ元のキャンバスをそのまま返す
+    if (!hasContent) return sourceCanvas;
+
+    const trimW = maxX - minX + 1;
+    const trimH = maxY - minY + 1;
+    const trimmed = document.createElement('canvas');
+    trimmed.width = trimW;
+    trimmed.height = trimH;
+    const trimCtx = trimmed.getContext('2d');
+    trimCtx.drawImage(sourceCanvas, minX, minY, trimW, trimH, 0, 0, trimW, trimH);
+    return trimmed;
   }
 
   function _escapeHtml(str) {

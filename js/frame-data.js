@@ -58,8 +58,8 @@ const FRAME_DATA = {
       categories: [
         {
           name: 'スタンダード',
-          outerStroke: '#000000',       // 黒破線
-          outerStrokeDash: [3, 3],      // 破線パターン
+          outerStroke: '#000000',       // 黒実線
+          outerStrokeDash: [],          // 実線
           innerStroke: '#FF0000',       // 赤破線
           innerStrokeDash: [2, 2],      // 破線パターン
           margin: 1,                     // 外枠と内枠の差（片側mm）

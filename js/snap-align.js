@@ -146,8 +146,9 @@ class SnapAlign {
     const frames = this.cm.getStampFrames();
     if (frames.length === 0) return;
 
-    const MARGIN = 5;  // A4端からの余白(mm)
-    const GAP = 3;     // 枠同士の間隔(mm)
+    const MARGIN = 5;       // A4端からの余白(mm)
+    const TOP_MARGIN = 10;  // 上部余白（タイトル分）(mm)
+    const GAP = 3;          // 枠同士の間隔(mm)
     const usableW = FRAME_DATA.A4_WIDTH - MARGIN * 2;
 
     // 1. スタンプIDでグループ化（同じ種類をまとめる）
@@ -227,7 +228,7 @@ class SnapAlign {
       } else {
         // 新しい棚を作成
         const y = shelves.length === 0
-          ? MARGIN
+          ? TOP_MARGIN
           : shelves[shelves.length - 1].y + shelves[shelves.length - 1].height + GAP;
 
         // A4からはみ出す場合はそのまま配置（ユーザーが手動で調整できる）

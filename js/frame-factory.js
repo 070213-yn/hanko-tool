@@ -4,7 +4,7 @@ class FrameFactory {
   constructor(canvasManager) {
     this.cm = canvasManager;
     this.nextX = 5;  // 次に配置するX座標（mm）
-    this.nextY = 5;  // 次に配置するY座標（mm）
+    this.nextY = 10; // 次に配置するY座標（mm）タイトル分の余白確保
     this.rowMaxHeight = 0; // 現在行の最大高さ
     this.padding = 3; // 枠間の余白（mm）
   }
@@ -46,7 +46,7 @@ class FrameFactory {
       evented: false,
     });
 
-    // ラベル（サイズ名）
+    // ラベル（スタンプID）
     const fontSize = Math.min(width, height) * 0.3;
     const clampedSize = Math.max(3, Math.min(8, fontSize));
     const label = new fabric.Text(stamp.id, {
@@ -63,8 +63,24 @@ class FrameFactory {
       opacity: 0.4,
     });
 
+    // サイズ表記（外枠の右下外側に表示）
+    const sizeDisplay = new fabric.Text(`${stamp.id} ${width}×${height}`, {
+      fontSize: 2.5,
+      fill: category.labelColor,
+      fontFamily: 'sans-serif',
+      fontWeight: '500',
+      selectable: false,
+      evented: false,
+      originX: 'right',
+      originY: 'top',
+      left: width,
+      top: height + 0.3,
+      opacity: 0.55,
+      isSizeLabel: true,
+    });
+
     // グループ化
-    const group = new fabric.Group([outerRect, innerRect, label], {
+    const group = new fabric.Group([outerRect, innerRect, label, sizeDisplay], {
       left: 0,
       top: 0,
       // 拡縮・回転をロック
@@ -101,6 +117,11 @@ class FrameFactory {
     // グリッドスナップイベント
     this._setupSnap(group);
 
+    // 画像配置の枠追従イベントを設定
+    if (window.imagePlacer) {
+      window.imagePlacer.setupFrameTracking(group);
+    }
+
     // 配置数を更新
     this._updateFrameCount();
 
@@ -122,7 +143,7 @@ class FrameFactory {
     // 縦方向もはみ出す場合は左上に戻す
     if (this.nextY + height > FRAME_DATA.A4_HEIGHT - 3) {
       this.nextX = 5;
-      this.nextY = 5;
+      this.nextY = 10;
       this.rowMaxHeight = 0;
     }
 
@@ -175,6 +196,32 @@ class FrameFactory {
         el.textContent = `配置数: ${count}`;
       }
     }
+  }
+
+  // 選択中のスタンプ枠を別のスタンプに差し替え
+  replaceFrame(oldFrame, newStamp, newCategory) {
+    const canvas = this.cm.getCanvas();
+    const oldLeft = oldFrame.left;
+    const oldTop = oldFrame.top;
+
+    // 配置済み画像情報を保存
+    let placementInfo = null;
+    if (window.imagePlacer) {
+      placementInfo = window.imagePlacer.getPlacementInfo(oldFrame);
+    }
+
+    // 古い枠を削除
+    canvas.remove(oldFrame);
+
+    // 同じ位置に新しいスタンプ枠を作成
+    const newFrame = this.createFrame(newStamp, newCategory, { left: oldLeft, top: oldTop });
+
+    // 画像を新しい枠に再配置（自動的に新しい内枠サイズにフィット）
+    if (window.imagePlacer && placementInfo) {
+      window.imagePlacer.restorePlacement(newFrame, placementInfo);
+    }
+
+    return newFrame;
   }
 
   // 選択中のスタンプ枠を90度回転（縦横切替）
@@ -267,7 +314,7 @@ class FrameFactory {
 
     // 配置位置をリセット
     this.nextX = 5;
-    this.nextY = 5;
+    this.nextY = 10;
     this.rowMaxHeight = 0;
     this._updateFrameCount();
   }

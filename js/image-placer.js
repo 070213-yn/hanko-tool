@@ -1,4 +1,5 @@
 // 二値化画像をスタンプ枠に配置する管理クラス
+// 画像は独立したfabric.Imageとしてキャンバスに配置し、clipPathで内枠にクリップ
 
 class ImagePlacer {
   constructor(canvasManager) {
@@ -6,7 +7,7 @@ class ImagePlacer {
     this.images = [];      // { id, name, dataURL, element(img) }
     this.nextId = 1;
     this.selectedId = null; // 選択中の画像ID
-    this.placements = {};   // frameのstampId+位置 → { imageId, fabricImg } のマップ
+    this.placements = {};   // frameUID → { imageId, fabricImg, clipRect } のマップ
   }
 
   // === ファイルアップロードから画像をインポート ===
@@ -22,6 +23,28 @@ class ImagePlacer {
         loaded++;
         if (loaded === imageFiles.length) {
           this.renderList();
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // === ファイルインポート完了後にコールバック（D&D用） ===
+  importFilesWithCallback(fileList, callback) {
+    const imageFiles = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
+
+    let loaded = 0;
+    const addedIds = [];
+    imageFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const id = this._addImage(file.name, e.target.result);
+        addedIds.push(id);
+        loaded++;
+        if (loaded === imageFiles.length) {
+          this.renderList();
+          if (callback) callback(addedIds[0]);
         }
       };
       reader.readAsDataURL(file);
@@ -58,13 +81,15 @@ class ImagePlacer {
     const img = new Image();
     img.src = dataURL;
 
+    const id = this.nextId++;
     this.images.push({
-      id: this.nextId++,
+      id: id,
       name: name,
       dataURL: dataURL,
       element: img,
-      placedFrameId: null,  // 配置済み枠のID（ユニーク識別子）
+      placedFrameId: null,
     });
+    return id;
   }
 
   // === 画像を選択 ===
@@ -85,7 +110,7 @@ class ImagePlacer {
     this._showPlacementHint(false);
   }
 
-  // === 選択中の画像を枠に配置 ===
+  // === 選択中の画像を枠に配置（独立オブジェクト方式） ===
   placeInFrame(frame) {
     if (!this.selectedId) return false;
 
@@ -103,55 +128,168 @@ class ImagePlacer {
     const innerW = stampW - margin * 2;
     const innerH = stampH - margin * 2;
 
-    // 画像をFabric.jsオブジェクトとして作成
+    // 画像をFabric.jsオブジェクトとして作成（独立・操作可能）
     const fabricImg = new fabric.Image(imageData.element, {
-      selectable: false,
-      evented: false,
+      selectable: true,
+      evented: true,
+      hasControls: true,
+      hasBorders: true,
+      lockRotation: true,
+      borderColor: '#6366f1',
+      cornerColor: '#6366f1',
+      cornerSize: 6,
+      cornerStyle: 'circle',
+      transparentCorners: false,
+      // カスタムプロパティ
+      isPlacedImage: true,
+      placerImageId: imageData.id,
+      _linkedFrameUid: this._getFrameUid(frame),
     });
 
-    // 内枠に収まるようにスケール
-    const scaleX = innerW / fabricImg.width;
-    const scaleY = innerH / fabricImg.height;
+    // 描画部分のバウンディングボックスを検出
+    const bounds = this._detectContentBounds(imageData.element);
+
+    // 描画部分が内枠に収まる最大スケールを計算
+    const scaleX = innerW / bounds.width;
+    const scaleY = innerH / bounds.height;
     const scale = Math.min(scaleX, scaleY);
 
-    const imgW = fabricImg.width * scale;
-    const imgH = fabricImg.height * scale;
+    // 内枠の中心座標（キャンバス座標）
+    const innerCenterX = frame.left + margin + innerW / 2;
+    const innerCenterY = frame.top + margin + innerH / 2;
 
-    // グループ内座標（中心が原点）
-    const imgLeft = margin + (innerW - imgW) / 2 - stampW / 2;
-    const imgTop = margin + (innerH - imgH) / 2 - stampH / 2;
+    // 描画部分の中心を内枠中心に合わせる
+    const contentCenterX = bounds.x + bounds.width / 2;
+    const contentCenterY = bounds.y + bounds.height / 2;
 
     fabricImg.set({
       scaleX: scale,
       scaleY: scale,
-      left: imgLeft,
-      top: imgTop,
-      // カスタムプロパティ
-      isPlacedImage: true,
-      placerImageId: imageData.id,
+      left: innerCenterX - contentCenterX * scale,
+      top: innerCenterY - contentCenterY * scale,
     });
 
-    // グループに画像を追加
-    frame.addWithUpdate(fabricImg);
-    this.cm.getCanvas().requestRenderAll();
+    // clipPathで内枠領域にクリップ
+    const clipRect = new fabric.Rect({
+      left: frame.left + margin,
+      top: frame.top + margin,
+      width: innerW,
+      height: innerH,
+      absolutePositioned: true,
+    });
+    fabricImg.clipPath = clipRect;
+
+    // フレームとの相対オフセットを記録（枠移動時の追従用）
+    fabricImg._offsetFromFrame = {
+      x: fabricImg.left - frame.left,
+      y: fabricImg.top - frame.top,
+    };
+    fabricImg._clipOffsetFromFrame = {
+      x: margin,
+      y: margin,
+    };
+
+    // キャンバスに追加
+    const canvas = this.cm.getCanvas();
+    canvas.add(fabricImg);
+    canvas.requestRenderAll();
 
     // 配置記録
     const frameUid = this._getFrameUid(frame);
     this.placements[frameUid] = {
       imageId: imageData.id,
       fabricImg: fabricImg,
+      clipRect: clipRect,
     };
 
     // 画像の配置状態を更新
     imageData.placedFrameId = frameUid;
 
-    // ラベルを非表示にする（画像が入ったので）
+    // ラベルを非表示にする
     this._setLabelVisible(frame, false);
+
+    // 画像移動/リサイズ後にオフセット再計算
+    this._setupImageTracking(fabricImg, frame);
 
     // 選択解除
     this.deselect();
 
     return true;
+  }
+
+  // === 枠移動時に画像とclipPathを追従させる ===
+  setupFrameTracking(frame) {
+    frame.on('moving', () => {
+      this._syncImageToFrame(frame);
+    });
+  }
+
+  // 枠に紐づく画像の位置を同期
+  _syncImageToFrame(frame) {
+    const frameUid = this._getFrameUid(frame);
+    const placement = this.placements[frameUid];
+    if (!placement) return;
+
+    const img = placement.fabricImg;
+    const clip = placement.clipRect;
+
+    img.set({
+      left: frame.left + img._offsetFromFrame.x,
+      top: frame.top + img._offsetFromFrame.y,
+    });
+
+    clip.set({
+      left: frame.left + img._clipOffsetFromFrame.x,
+      top: frame.top + img._clipOffsetFromFrame.y,
+    });
+
+    img.setCoords();
+  }
+
+  // ActiveSelection移動時に全フレームの画像を同期（app.jsから呼ぶ）
+  syncAllFrameImages(activeSelection) {
+    if (!activeSelection || !activeSelection.getObjects) return;
+    const objects = activeSelection.getObjects();
+    const groupMatrix = activeSelection.calcTransformMatrix();
+
+    objects.forEach(obj => {
+      if (!obj.isStampFrame) return;
+
+      const frameUid = this._getFrameUid(obj);
+      const placement = this.placements[frameUid];
+      if (!placement) return;
+
+      // グループ内オブジェクトの絶対位置を計算
+      const absPoint = fabric.util.transformPoint(
+        new fabric.Point(obj.left, obj.top),
+        groupMatrix
+      );
+
+      const img = placement.fabricImg;
+      const clip = placement.clipRect;
+
+      img.set({
+        left: absPoint.x + img._offsetFromFrame.x,
+        top: absPoint.y + img._offsetFromFrame.y,
+      });
+
+      clip.set({
+        left: absPoint.x + img._clipOffsetFromFrame.x,
+        top: absPoint.y + img._clipOffsetFromFrame.y,
+      });
+
+      img.setCoords();
+    });
+  }
+
+  // 画像のリサイズ/移動後にオフセットを更新
+  _setupImageTracking(fabricImg, frame) {
+    fabricImg.on('modified', () => {
+      fabricImg._offsetFromFrame = {
+        x: fabricImg.left - frame.left,
+        y: fabricImg.top - frame.top,
+      };
+    });
   }
 
   // === 枠から画像を外す ===
@@ -167,8 +305,8 @@ class ImagePlacer {
     const placement = this.placements[frameUid];
     if (!placement) return;
 
-    // グループから画像を削除
-    frame.removeWithUpdate(placement.fabricImg);
+    // キャンバスから画像を直接削除
+    this.cm.getCanvas().remove(placement.fabricImg);
 
     // 配置記録を削除
     const imageData = this.images.find(i => i.id === placement.imageId);
@@ -188,6 +326,9 @@ class ImagePlacer {
     const placement = this.placements[frameUid];
     if (!placement) return;
 
+    // キャンバスから画像も削除
+    this.cm.getCanvas().remove(placement.fabricImg);
+
     const imageData = this.images.find(i => i.id === placement.imageId);
     if (imageData) {
       imageData.placedFrameId = null;
@@ -202,6 +343,9 @@ class ImagePlacer {
     const placement = this.placements[frameUid];
     if (!placement) return null;
 
+    // キャンバスから画像を削除
+    this.cm.getCanvas().remove(placement.fabricImg);
+
     // 古い記録を削除
     const imageData = this.images.find(i => i.id === placement.imageId);
     if (imageData) imageData.placedFrameId = null;
@@ -210,7 +354,7 @@ class ImagePlacer {
     return { imageId: placement.imageId };
   }
 
-  // === 回転後に再配置 ===
+  // === 回転後・Undo/Redo後に再配置 ===
   restorePlacement(frame, placementInfo) {
     if (!placementInfo) return;
 
@@ -221,6 +365,25 @@ class ImagePlacer {
     const prevSelected = this.selectedId;
     this.selectedId = imageData.id;
     this.placeInFrame(frame);
+
+    // imageStateがある場合はユーザーが調整した位置・スケールを復元
+    if (placementInfo.imageState) {
+      const frameUid = this._getFrameUid(frame);
+      const placement = this.placements[frameUid];
+      if (placement) {
+        placement.fabricImg.set({
+          left: placementInfo.imageState.left,
+          top: placementInfo.imageState.top,
+          scaleX: placementInfo.imageState.scaleX,
+          scaleY: placementInfo.imageState.scaleY,
+        });
+        placement.fabricImg._offsetFromFrame = { ...placementInfo.imageState.offsetFromFrame };
+        placement.fabricImg._clipOffsetFromFrame = { ...placementInfo.imageState.clipOffsetFromFrame };
+        placement.fabricImg.setCoords();
+        this.cm.getCanvas().requestRenderAll();
+      }
+    }
+
     this.selectedId = prevSelected;
   }
 
@@ -235,7 +398,6 @@ class ImagePlacer {
     if (imageData.placedFrameId) {
       const placement = this.placements[imageData.placedFrameId];
       if (placement) {
-        // 枠を見つけて除去
         const frames = this.cm.getStampFrames();
         for (const frame of frames) {
           if (this._getFrameUid(frame) === imageData.placedFrameId) {
@@ -252,14 +414,61 @@ class ImagePlacer {
     this.cm.getCanvas().requestRenderAll();
   }
 
+  // === 描画部分（非透明ピクセル）のバウンディングボックスを検出 ===
+  _detectContentBounds(imgElement) {
+    const w = imgElement.naturalWidth || imgElement.width;
+    const h = imgElement.naturalHeight || imgElement.height;
+
+    // 画像がまだロードされていない場合は全体を返す
+    if (!w || !h) return { x: 0, y: 0, width: w || 1, height: h || 1 };
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = w;
+    tempCanvas.height = h;
+    const ctx = tempCanvas.getContext('2d');
+    ctx.drawImage(imgElement, 0, 0);
+
+    let data;
+    try {
+      data = ctx.getImageData(0, 0, w, h).data;
+    } catch (e) {
+      // CORS等でgetImageDataが失敗した場合は全体を返す
+      return { x: 0, y: 0, width: w, height: h };
+    }
+
+    let minX = w, minY = h, maxX = 0, maxY = 0;
+    let hasContent = false;
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const alpha = data[(y * w + x) * 4 + 3];
+        if (alpha > 0) {
+          hasContent = true;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    if (!hasContent) {
+      return { x: 0, y: 0, width: w, height: h };
+    }
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX + 1,
+      height: maxY - minY + 1,
+    };
+  }
+
   // === サイドバーの画像一覧を描画 ===
   renderList() {
-    // PC用サイドバー
     this._renderListTo('placer-image-list');
-    // モバイル用
     this._renderListTo('mobile-placer-image-list');
 
-    // カウント表示
     const countEl = document.getElementById('placer-count');
     if (countEl) {
       countEl.textContent = this.images.length > 0 ? `${this.images.length}枚` : '';
@@ -290,24 +499,29 @@ class ImagePlacer {
         (isSelected ? ' selected' : '') +
         (isPlaced ? ' placed' : '');
 
+      // ドラッグ可能にする（枠へのD&D配置用）
+      item.draggable = true;
+      item.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', 'placer-image:' + img.id);
+        e.dataTransfer.effectAllowed = 'copy';
+      });
+
       item.innerHTML = `
         <img src="${img.dataURL}" class="placer-thumb" alt="${this._escapeHtml(img.name)}">
         <div class="placer-info">
           <span class="placer-name">${this._escapeHtml(img.name)}</span>
-          <span class="placer-status">${isPlaced ? '配置済み' : (isSelected ? '選択中 - 枠をクリック' : '')}</span>
+          <span class="placer-status">${isPlaced ? '配置済み' : (isSelected ? '選択中 - 枠をクリック' : 'ドラッグで枠に配置')}</span>
         </div>
         <button class="placer-remove" data-remove-id="${img.id}" title="リストから削除">
           <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/></svg>
         </button>
       `;
 
-      // サムネイルクリックで選択
       item.addEventListener('click', (e) => {
         if (e.target.closest('.placer-remove')) return;
         this.select(img.id);
       });
 
-      // 削除ボタン
       const removeBtn = item.querySelector('.placer-remove');
       removeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -320,7 +534,6 @@ class ImagePlacer {
 
   // === ヘルパー ===
 
-  // 枠のユニーク識別子（オブジェクトごとにユニーク）
   _getFrameUid(frame) {
     if (!frame._placerUid) {
       frame._placerUid = 'frame_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
@@ -328,16 +541,40 @@ class ImagePlacer {
     return frame._placerUid;
   }
 
-  // ラベル（グループの3番目の要素）の表示/非表示
   _setLabelVisible(frame, visible) {
     const objects = frame.getObjects();
-    // objects[2] がラベル
     if (objects.length >= 3 && objects[2] instanceof fabric.Text) {
-      objects[2].set({ opacity: visible ? 0.4 : 0 });
+      const sw = frame.stampWidth;
+      const sh = frame.stampHeight;
+      const margin = frame._category ? frame._category.margin : 2;
+
+      if (visible) {
+        // 画像なし: 中央に大きく表示
+        const fontSize = Math.min(sw, sh) * 0.3;
+        objects[2].set({
+          originX: 'center',
+          originY: 'center',
+          left: 0,
+          top: 0,
+          fontSize: Math.max(3, Math.min(8, fontSize)),
+          opacity: 0.4,
+        });
+      } else {
+        // 画像あり: 上部マージン内に小さく表示
+        const labelSize = Math.max(1.2, Math.min(margin - 0.1, 2));
+        objects[2].set({
+          originX: 'center',
+          originY: 'top',
+          left: 0,
+          top: -sh / 2 + 0.1,
+          fontSize: labelSize,
+          opacity: 0.8,
+        });
+      }
+      frame.dirty = true;
     }
   }
 
-  // 配置ヒント表示切替
   _showPlacementHint(show) {
     const hint = document.getElementById('placement-hint');
     if (hint) hint.classList.toggle('active', show);

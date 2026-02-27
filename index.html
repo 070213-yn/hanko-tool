@@ -27,6 +27,9 @@
   <!-- Fabric.js v5 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 
+  <!-- ag-psd (PSD書出し用) -->
+  <script src="https://cdn.jsdelivr.net/npm/ag-psd@30.1.0/dist/bundle.js"></script>
+
   <!-- カスタムCSS -->
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -51,8 +54,20 @@
             <h1 class="text-base font-semibold text-gray-800 leading-tight">はんこどり</h1>
             <p class="text-[10px] text-gray-400 font-medium tracking-wider">入稿データ作成ツール</p>
           </div>
+          <div class="title-input-wrap">
+            <label class="text-[10px] text-gray-400 font-medium">タイトル:</label>
+            <input id="title-input" type="text" value="入稿データ" placeholder="入稿データ" class="title-input">
+          </div>
         </div>
         <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1">
+            <button class="undo-redo-btn" data-action="undo" disabled title="元に戻す (Ctrl+Z)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h10a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5H8M3 10l4-4M3 10l4 4"/></svg>
+            </button>
+            <button class="undo-redo-btn" data-action="redo" disabled title="やり直す (Ctrl+Shift+Z)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10H11a5 5 0 0 0-5 5v0a5 5 0 0 0 5 5h5M21 10l-4-4M21 10l-4 4"/></svg>
+            </button>
+          </div>
           <label class="grid-toggle-label">
             <input type="checkbox" id="grid-toggle" checked>
             <span class="grid-toggle-track">
@@ -89,30 +104,26 @@
             <div class="maker-tab-indicator"></div>
           </div>
 
-          <!-- 使い方ヒント -->
-          <div id="usage-hint" class="usage-hint">
-            <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5">
-              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd"/>
-            </svg>
-            <div>
-              <p class="text-xs font-medium text-gray-600">下のボタンをタップするとA4キャンバスに枠が追加されます</p>
-              <button id="hide-hint" class="text-[10px] text-gray-400 hover:text-gray-600 mt-1">閉じる</button>
+          <!-- 2列レイアウト -->
+          <div class="sidebar-columns">
+            <!-- 左カラム: スタンプ枠 -->
+            <div class="sidebar-col">
+              <div class="sidebar-section">
+                <div class="section-label">
+                  <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                    <path d="M2 4.25A2.25 2.25 0 014.25 2h11.5A2.25 2.25 0 0118 4.25v8.5A2.25 2.25 0 0115.75 15h-3.105a3.501 3.501 0 001.1 1.677A.75.75 0 0113.26 18H6.74a.75.75 0 01-.484-1.323A3.501 3.501 0 007.355 15H4.25A2.25 2.25 0 012 12.75v-8.5z"/>
+                  </svg>
+                  スタンプ枠
+                </div>
+                <div id="replace-hint" class="replace-hint hidden">長押しで差し替え（PCはShift+クリック）</div>
+                <div id="stamp-list">
+                  <!-- JSで動的生成 -->
+                </div>
+              </div>
             </div>
-          </div>
 
-          <!-- スタンプ一覧 -->
-          <div class="sidebar-section">
-            <div class="section-label">
-              <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-                <path d="M2 4.25A2.25 2.25 0 014.25 2h11.5A2.25 2.25 0 0118 4.25v8.5A2.25 2.25 0 0115.75 15h-3.105a3.501 3.501 0 001.1 1.677A.75.75 0 0113.26 18H6.74a.75.75 0 01-.484-1.323A3.501 3.501 0 007.355 15H4.25A2.25 2.25 0 012 12.75v-8.5z"/>
-              </svg>
-              スタンプ枠
-            </div>
-            <div id="stamp-list">
-              <!-- JSで動的生成 -->
-            </div>
-          </div>
-
+            <!-- 右カラム: ツール -->
+            <div class="sidebar-col">
           <!-- 画像を配置 -->
           <div class="sidebar-section">
             <div class="section-label">
@@ -162,19 +173,19 @@
               </button>
               <button class="align-btn" data-align="centerH" title="水平中央揃え">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="2 2"/><rect x="5" y="6" width="14" height="4" rx="1"/><rect x="7" y="14" width="10" height="4" rx="1"/></svg>
-                <span class="align-label">中H</span>
+                <span class="align-label">横中央</span>
               </button>
               <button class="align-btn" data-align="centerV" title="垂直中央揃え">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="12" x2="22" y2="12" stroke-dasharray="2 2"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="7" width="4" height="10" rx="1"/></svg>
-                <span class="align-label">中V</span>
+                <span class="align-label">縦中央</span>
               </button>
               <button class="align-btn" data-align="distributeH" title="水平均等分布">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="4" y2="20"/><line x1="20" y1="4" x2="20" y2="20"/><rect x="8" y="8" width="3" height="8" rx="1"/><rect x="13" y="8" width="3" height="8" rx="1"/></svg>
-                <span class="align-label">均H</span>
+                <span class="align-label">横均等</span>
               </button>
               <button class="align-btn" data-align="distributeV" title="垂直均等分布">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="4"/><line x1="4" y1="20" x2="20" y2="20"/><rect x="8" y="8" width="8" height="3" rx="1"/><rect x="8" y="13" width="8" height="3" rx="1"/></svg>
-                <span class="align-label">均V</span>
+                <span class="align-label">縦均等</span>
               </button>
             </div>
             <div class="flex gap-2 mt-2">
@@ -212,9 +223,19 @@
                 <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"/><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/></svg>
                 PNG書出し (1200DPI)
               </button>
-              <button id="btn-export-svg" class="action-btn glass-secondary">
+              <button id="btn-export-psd" class="action-btn glass-secondary">
                 <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"/><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/></svg>
-                SVG書出し
+                PSD書出し (レイヤー分け)
+              </button>
+            </div>
+            <div class="save-buttons">
+              <button id="btn-save" class="action-btn glass-save">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z"/></svg>
+                保存
+              </button>
+              <button id="btn-load" class="action-btn glass-load">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z" clip-rule="evenodd"/></svg>
+                読込
               </button>
             </div>
           </div>
@@ -224,6 +245,8 @@
             <span class="frame-counter-num">0</span>
             <span>枠を配置中</span>
           </div>
+            </div><!-- /sidebar-col (右カラム) -->
+          </div><!-- /sidebar-columns -->
         </div>
       </aside>
 
@@ -293,17 +316,28 @@
           <button class="align-btn-sm" data-align="right" title="右揃え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="4" x2="20" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="11" y="14" width="6" height="4" rx="1"/></svg></button>
           <button class="align-btn-sm" data-align="top" title="上揃え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="4"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="7" width="4" height="6" rx="1"/></svg></button>
           <button class="align-btn-sm" data-align="bottom" title="下揃え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="20"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="11" width="4" height="6" rx="1"/></svg></button>
-          <button class="align-btn-sm" data-align="centerH" title="中央H"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="2 2"/><rect x="5" y="6" width="14" height="4" rx="1"/><rect x="7" y="14" width="10" height="4" rx="1"/></svg></button>
-          <button class="align-btn-sm" data-align="centerV" title="中央V"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="12" x2="22" y2="12" stroke-dasharray="2 2"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="7" width="4" height="10" rx="1"/></svg></button>
-          <button class="align-btn-sm" data-align="distributeH" title="均等H"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="4" y2="20"/><line x1="20" y1="4" x2="20" y2="20"/><rect x="8" y="8" width="3" height="8" rx="1"/><rect x="13" y="8" width="3" height="8" rx="1"/></svg></button>
-          <button class="align-btn-sm" data-align="distributeV" title="均等V"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="4"/><line x1="4" y1="20" x2="20" y2="20"/><rect x="8" y="8" width="8" height="3" rx="1"/><rect x="8" y="13" width="8" height="3" rx="1"/></svg></button>
+          <button class="align-btn-sm" data-align="centerH" title="横中央"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="2 2"/><rect x="5" y="6" width="14" height="4" rx="1"/><rect x="7" y="14" width="10" height="4" rx="1"/></svg></button>
+          <button class="align-btn-sm" data-align="centerV" title="縦中央"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="12" x2="22" y2="12" stroke-dasharray="2 2"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="7" width="4" height="10" rx="1"/></svg></button>
+          <button class="align-btn-sm" data-align="distributeH" title="横均等"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="4" y2="20"/><line x1="20" y1="4" x2="20" y2="20"/><rect x="8" y="8" width="3" height="8" rx="1"/><rect x="13" y="8" width="3" height="8" rx="1"/></svg></button>
+          <button class="align-btn-sm" data-align="distributeV" title="縦均等"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="4"/><line x1="4" y1="20" x2="20" y2="20"/><rect x="8" y="8" width="8" height="3" rx="1"/><rect x="8" y="13" width="8" height="3" rx="1"/></svg></button>
           <button id="mobile-btn-rotate" class="rotate-btn-sm" title="縦横切替">縦横</button>
           <button class="auto-arrange-btn-sm" data-align="autoArrange" title="自動整列">自動整列</button>
+        </div>
+        <div class="flex gap-2 mb-2">
+          <button class="undo-redo-btn flex-1" data-action="undo" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h10a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5H8M3 10l4-4M3 10l4 4"/></svg>
+            戻す
+          </button>
+          <button class="undo-redo-btn flex-1" data-action="redo" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10H11a5 5 0 0 0-5 5v0a5 5 0 0 0 5 5h5M21 10l-4-4M21 10l-4 4"/></svg>
+            やり直す
+          </button>
         </div>
         <div class="flex gap-2">
           <button id="mobile-btn-delete" class="action-btn glass-danger flex-1" disabled>削除</button>
           <button id="mobile-btn-clear" class="action-btn glass-danger flex-1">全削除</button>
           <button id="mobile-btn-export" class="action-btn glass-primary flex-1">PNG書出し</button>
+          <button id="mobile-btn-export-psd" class="action-btn glass-secondary flex-1">PSD</button>
         </div>
       </div>
     </div>
@@ -315,6 +349,18 @@
         <p id="loading-text">エクスポート中...</p>
       </div>
     </div>
+
+    <!-- 読込モーダル -->
+    <div id="load-modal" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>保存データを読み込む</h3>
+          <button id="load-modal-close" class="modal-close-btn">&times;</button>
+        </div>
+        <div id="load-list" class="load-list"></div>
+        <div id="load-empty" class="load-empty">保存データがありません</div>
+      </div>
+    </div>
   </div>
 
   <!-- JavaScript -->
@@ -324,6 +370,8 @@
   <script src="js/snap-align.js"></script>
   <script src="js/exporter.js"></script>
   <script src="js/image-placer.js"></script>
+  <script src="js/history-manager.js"></script>
+  <script src="js/storage-manager.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
