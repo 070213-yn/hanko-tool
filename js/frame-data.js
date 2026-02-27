@@ -89,6 +89,10 @@ const FRAME_DATA = {
   // Googleスプレッドシート連携用
   sheetId: '1K6aqI79ZdEvCp0CMpi9eUzlxUl3ub5eWGThDadRaQj0',
 
+  // Google Apps Script Web App URL（クラウド保存用）
+  // Apps Scriptをデプロイ後にURLを設定する
+  appsScriptUrl: '',
+
   // シート名 → メーカーキーのマッピング
   // シート名（タブ名）がメーカー名に対応する
   sheetMakers: [

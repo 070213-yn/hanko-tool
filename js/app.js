@@ -25,9 +25,14 @@
     historyManager.init(canvasManager, frameFactory, imagePlacer);
     historyManager.onRestore = _updateEmptyMsg;
 
-    // IndexedDB初期化
+    // IndexedDB初期化（フォールバック用）
     storageManager = new StorageManager();
     try { await storageManager.init(); } catch (e) { console.error('DB初期化エラー:', e); }
+
+    // クラウドストレージ初期化（Apps Script URL設定済みの場合）
+    if (FRAME_DATA.appsScriptUrl) {
+      window._cloudStorage = new CloudStorage(FRAME_DATA.appsScriptUrl);
+    }
 
     // グローバル公開（frame-factory等から参照）
     window.imagePlacer = imagePlacer;
@@ -235,62 +240,34 @@
     }
   }
 
-  // === スタンプボタンにイベントを設定（クリック＋長押し対応） ===
+  // === スタンプボタンにイベントを設定 ===
   function _setupStampBtn(btn, stamp, cat) {
-    let pressTimer = null;
-    let longPressTriggered = false;
-
-    // タッチデバイス: 長押し(500ms)で差し替え
-    btn.addEventListener('touchstart', () => {
-      longPressTriggered = false;
-      pressTimer = setTimeout(() => {
-        longPressTriggered = true;
-        _handleStampClick(stamp, cat, { shiftKey: true });
-      }, 500);
-    }, { passive: true });
-
-    btn.addEventListener('touchend', () => {
-      clearTimeout(pressTimer);
-    });
-
-    btn.addEventListener('touchmove', () => {
-      clearTimeout(pressTimer);
-    }, { passive: true });
-
-    // クリック: 通常追加 / Shift+クリックで差し替え（PC）
-    btn.addEventListener('click', (e) => {
-      if (longPressTriggered) {
-        longPressTriggered = false;
-        return; // 長押し後のクリックは無視
-      }
-      _handleStampClick(stamp, cat, e);
+    btn.addEventListener('click', () => {
+      _handleStampClick(stamp, cat);
     });
   }
 
   // === スタンプボタンクリック処理 ===
-  // 通常クリック/タップ: 新規追加（連続でどんどん追加可能）
-  // Shift+クリック / 長押し: 選択中の枠を差し替え
-  function _handleStampClick(stamp, cat, event) {
+  // 枠が1つ選択中 → 差し替え / それ以外 → 新規追加（追加後は選択解除）
+  function _handleStampClick(stamp, cat) {
     const canvas = canvasManager.getCanvas();
     const activeObjects = canvas.getActiveObjects();
     const selectedFrames = activeObjects.filter(o => o.isStampFrame);
 
-    // Shift+クリック: 選択中の枠を差し替え
-    if (event && event.shiftKey && selectedFrames.length === 1) {
+    if (selectedFrames.length === 1) {
+      // 枠が1つ選択中 → 差し替え
       canvas.discardActiveObject();
       frameFactory.replaceFrame(selectedFrames[0], stamp, cat);
-      _updateEmptyMsg();
-      historyManager.saveState();
-      return;
+    } else {
+      // 未選択 or 複数選択 → 新規追加、追加後は選択解除
+      canvas.discardActiveObject();
+      frameFactory.createFrame(stamp, cat);
+      canvas.discardActiveObject();
     }
 
-    // 通常クリック: 選択を解除して新規追加
-    canvas.discardActiveObject();
-    frameFactory.createFrame(stamp, cat);
+    canvas.requestRenderAll();
     _updateEmptyMsg();
     historyManager.saveState();
-    const hint = document.getElementById('usage-hint');
-    if (hint) hint.classList.add('hidden');
   }
 
   // === 空状態メッセージの表示/非表示 ===
@@ -457,19 +434,12 @@
     const updateSelection = () => {
       const selectedFrames = canvas.getActiveObjects().filter(o => o.isStampFrame);
       const hasSelection = selectedFrames.length > 0;
-      const singleFrame = selectedFrames.length === 1;
 
       // 削除ボタンの有効/無効
       const btn = document.getElementById('btn-delete-selected');
       if (btn) btn.disabled = !hasSelection;
       const mobileBtn = document.getElementById('mobile-btn-delete');
       if (mobileBtn) mobileBtn.disabled = !hasSelection;
-
-      // 差し替えヒントの表示/非表示
-      const hint = document.getElementById('replace-hint');
-      if (hint) {
-        hint.classList.toggle('hidden', !singleFrame);
-      }
     };
 
     canvas.on('selection:created', updateSelection);
@@ -787,30 +757,17 @@
     };
     input.addEventListener('input', syncTitle);
 
-    // タイトルにテキストを追記するヘルパー
-    function appendToTitle(text) {
-      if (input.value && input.value.trim()) {
-        input.value += ' ' + text;
-      } else {
-        input.value = text;
-      }
-      syncTitle();
-    }
-
-    // 「はんこどり」ボタン
-    const btnHankodori = document.getElementById('title-btn-hankodori');
-    if (btnHankodori) {
-      btnHankodori.addEventListener('click', () => appendToTitle('はんこどり'));
-    }
-
-    // 「新作」ボタン（年月ドロップダウンの値を使う）
-    const btnShinsaku = document.getElementById('title-btn-shinsaku');
-    const yearSelect = document.getElementById('title-year');
-    const monthSelect = document.getElementById('title-month');
-    if (btnShinsaku && yearSelect && monthSelect) {
-      btnShinsaku.addEventListener('click', () => {
-        const text = `${yearSelect.value}年${monthSelect.value}月新作`;
-        appendToTitle(text);
+    // 「適用」ボタン: 全ドロップダウンの値を組み合わせてタイトルに設定
+    const btnApply = document.getElementById('title-btn-apply');
+    if (btnApply) {
+      btnApply.addEventListener('click', () => {
+        const maker = document.getElementById('title-maker')?.value || '';
+        const prefix = document.getElementById('title-prefix')?.value || '';
+        const year = document.getElementById('title-year')?.value || '';
+        const month = document.getElementById('title-month')?.value || '';
+        const parts = [prefix, maker, `${year}年${month}月新作`];
+        input.value = parts.join('_');
+        syncTitle();
       });
     }
   }
@@ -832,15 +789,30 @@
     }
   }
 
+  // ストレージインスタンスを取得（クラウド優先、フォールバックはIndexedDB）
+  function _getStorage() {
+    if (FRAME_DATA.appsScriptUrl && window._cloudStorage) {
+      return window._cloudStorage;
+    }
+    return storageManager;
+  }
+
   // プロジェクトを保存
   async function _saveProject() {
-    if (!storageManager || !storageManager.db) {
+    const storage = _getStorage();
+    const isCloud = storage instanceof CloudStorage;
+
+    if (!isCloud && (!storageManager || !storageManager.db)) {
       alert('保存機能の初期化に失敗しました。ページを再読み込みしてください。');
       return;
     }
 
     const titleInput = document.getElementById('title-input');
     const title = (titleInput && titleInput.value.trim()) || '入稿データ';
+
+    // ローディング表示
+    const btn = document.getElementById('btn-save');
+    if (btn) { btn.disabled = true; btn.textContent = '保存中...'; }
 
     // 現在のキャンバス状態をキャプチャ
     const snapshot = historyManager._capture();
@@ -862,32 +834,45 @@
       dataURL: img.dataURL,
     }));
 
-    const project = {
-      title: title,
-      timestamp: Date.now(),
-      frameCount: serialized.length,
+    const projectData = {
+      frames: serialized,
+      images: images,
+      nextId: imagePlacer.nextId,
       maker: currentMaker,
-      data: {
-        frames: serialized,
-        images: images,
-        nextId: imagePlacer.nextId,
-      },
     };
 
     try {
-      if (currentProjectId) {
-        // 上書き保存
-        project.id = currentProjectId;
-        await storageManager.update(project);
-      } else {
-        // 新規保存
-        const newId = await storageManager.save(project);
+      if (isCloud) {
+        // クラウド保存
+        const newId = await storage.save({
+          id: currentProjectId || null,
+          title: title,
+          data: projectData,
+        });
         currentProjectId = newId;
+      } else {
+        // IndexedDB保存
+        const project = {
+          title: title,
+          timestamp: Date.now(),
+          frameCount: serialized.length,
+          maker: currentMaker,
+          data: projectData,
+        };
+        if (currentProjectId) {
+          project.id = currentProjectId;
+          await storageManager.update(project);
+        } else {
+          const newId = await storageManager.save(project);
+          currentProjectId = newId;
+        }
       }
       _showSaveNotice(title);
     } catch (e) {
       console.error('保存エラー:', e);
-      alert('保存に失敗しました。');
+      alert('保存に失敗しました。\n' + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z"/></svg> 保存'; }
     }
   }
 
@@ -909,9 +894,11 @@
     if (!modal || !list) return;
 
     list.innerHTML = '';
+    const storage = _getStorage();
+    const isCloud = storage instanceof CloudStorage;
 
     try {
-      const projects = await storageManager.getAll();
+      const projects = isCloud ? await storage.getAll() : await storageManager.getAll();
 
       if (projects.length === 0) {
         empty.classList.add('show');
@@ -921,15 +908,18 @@
         list.style.display = 'block';
 
         projects.forEach(proj => {
-          const d = new Date(proj.timestamp);
-          const dateStr = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+          let dateStr = '';
+          if (proj.timestamp) {
+            const d = new Date(proj.timestamp);
+            dateStr = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+          }
 
           const item = document.createElement('div');
           item.className = 'load-item';
           item.innerHTML = `
             <div class="load-item-info">
-              <span class="load-item-title">${_escapeHtml(proj.title)}</span>
-              <span class="load-item-meta">${dateStr} - ${proj.frameCount || 0}枠</span>
+              <span class="load-item-title">${_escapeHtml(proj.title || '入稿データ')}</span>
+              <span class="load-item-meta">${dateStr}</span>
             </div>
             <div class="load-item-actions">
               <button class="load-item-btn" data-load-id="${proj.id}">読込</button>
@@ -945,11 +935,10 @@
           item.querySelector('.load-item-delete').addEventListener('click', async (e) => {
             e.stopPropagation();
             if (confirm(`「${proj.title}」を削除しますか？`)) {
-              await storageManager.delete(proj.id);
+              await storage.delete(proj.id);
               if (currentProjectId === proj.id) currentProjectId = null;
               item.remove();
-              // リストが空になったら空メッセージ表示
-              const remaining = await storageManager.getAll();
+              const remaining = isCloud ? await storage.getAll() : await storageManager.getAll();
               if (remaining.length === 0) {
                 empty.classList.add('show');
                 list.style.display = 'none';
@@ -964,13 +953,15 @@
       modal.classList.add('show');
     } catch (e) {
       console.error('読込一覧エラー:', e);
-      alert('保存データの読み取りに失敗しました。');
+      alert('保存データの読み取りに失敗しました。\n' + e.message);
     }
   }
 
   // プロジェクトを読み込み
   async function _loadProject(id) {
-    const project = await storageManager.get(id);
+    const storage = _getStorage();
+    const isCloud = storage instanceof CloudStorage;
+    const project = isCloud ? await storage.get(id) : await storageManager.get(id);
     if (!project) return;
 
     // 現在のキャンバスをクリア
@@ -991,8 +982,9 @@
     }
 
     // メーカータブを復元
-    if (project.maker) {
-      currentMaker = project.maker;
+    const maker = project.maker || (project.data && project.data.maker);
+    if (maker) {
+      currentMaker = maker;
       document.querySelectorAll('.maker-tab').forEach(t => {
         if (t.dataset.maker) {
           t.classList.toggle('active', t.dataset.maker === currentMaker);

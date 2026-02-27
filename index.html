@@ -58,24 +58,40 @@
             <label class="text-[10px] text-gray-400 font-medium">タイトル:</label>
             <input id="title-input" type="text" value="入稿データ" placeholder="入稿データ" class="title-input">
             <div class="title-quick-btns">
-              <button id="title-btn-hankodori" class="title-quick-btn">はんこどり</button>
-              <div class="title-quick-group">
-                <select id="title-year" class="title-quick-select">
-                  <option value="2025">2025</option>
-                  <option value="2026" selected>2026</option>
-                  <option value="2027">2027</option>
-                  <option value="2028">2028</option>
-                </select>
-                <span class="title-quick-label">年</span>
-                <select id="title-month" class="title-quick-select">
-                  <option value="1">1</option><option value="2">2</option><option value="3">3</option>
-                  <option value="4">4</option><option value="5">5</option><option value="6">6</option>
-                  <option value="7">7</option><option value="8">8</option><option value="9">9</option>
-                  <option value="10">10</option><option value="11">11</option><option value="12">12</option>
-                </select>
-                <span class="title-quick-label">月</span>
-                <button id="title-btn-shinsaku" class="title-quick-btn">新作</button>
-              </div>
+              <select id="title-maker" class="title-quick-select">
+                <option value="からふるや様">からふるや様</option>
+                <option value="ヤマダ様">ヤマダ様</option>
+              </select>
+              <select id="title-prefix" class="title-quick-select">
+                <option value="はんこどり">はんこどり</option>
+              </select>
+              <select id="title-year" class="title-quick-select">
+                <option value="2025">2025</option>
+                <option value="2026" selected>2026</option>
+                <option value="2027">2027</option>
+                <option value="2028">2028</option>
+                <option value="2029">2029</option>
+                <option value="2030">2030</option>
+                <option value="2031">2031</option>
+                <option value="2032">2032</option>
+                <option value="2033">2033</option>
+                <option value="2034">2034</option>
+                <option value="2035">2035</option>
+                <option value="2036">2036</option>
+                <option value="2037">2037</option>
+                <option value="2038">2038</option>
+                <option value="2039">2039</option>
+                <option value="2040">2040</option>
+              </select>
+              <span class="title-quick-label">年</span>
+              <select id="title-month" class="title-quick-select">
+                <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+              </select>
+              <span class="title-quick-label">月新作</span>
+              <button id="title-btn-apply" class="title-quick-btn">適用</button>
             </div>
           </div>
         </div>
@@ -392,6 +408,7 @@
   <script src="js/image-placer.js"></script>
   <script src="js/history-manager.js"></script>
   <script src="js/storage-manager.js"></script>
+  <script src="js/cloud-storage.js"></script>
   <script src="js/sheet-fetcher.js"></script>
   <script src="js/app.js"></script>
 </body>
