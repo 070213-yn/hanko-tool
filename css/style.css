@@ -394,6 +394,14 @@ html, body {
   position: relative;
 }
 
+/* パネル内の先頭要素がボタンと重ならないようにする */
+.panel-collapsible .sidebar-inner > .maker-tabs:first-child,
+.panel-collapsible .sidebar-inner > .section-label:first-child,
+.panel-collapsible .sidebar-inner > .sidebar-section:first-child > .section-label,
+.panel-collapsible .image-panel-inner > .section-label:first-child {
+  padding-right: 28px;
+}
+
 .panel-collapse-btn {
   position: absolute;
   top: 8px;
