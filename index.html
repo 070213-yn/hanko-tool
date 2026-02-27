@@ -277,7 +277,7 @@
             </div>
           </div>
 
-          <!-- 複製ボタン（新機能）-->
+          <!-- 複製・メモ反映 -->
           <div class="toolbar-section">
             <button id="btn-duplicate" class="rotate-btn w-full" title="選択した枠を複製">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
@@ -286,6 +286,23 @@
               </svg>
               複製
             </button>
+            <button id="btn-sync-memo" class="rotate-btn w-full mt-1.5" title="画像のメモを枠に反映">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
+                <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              メモを反映
+            </button>
+          </div>
+
+          <!-- グリッドスナップ -->
+          <div class="toolbar-section">
+            <label class="snap-toggle-label" title="ONにすると枠が5mmグリッド線に吸着します">
+              <input type="checkbox" id="snap-toggle">
+              <span class="snap-toggle-track">
+                <span class="snap-toggle-thumb"></span>
+              </span>
+              <span class="snap-toggle-text">グリッドにスナップ</span>
+            </label>
           </div>
 
           <!-- アクションボタン -->

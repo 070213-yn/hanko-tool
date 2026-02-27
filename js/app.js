@@ -161,6 +161,43 @@
     });
   }
 
+  // === 画像メモを枠に反映 ===
+  function _syncImageMemosToFrames() {
+    const frames = canvasManager.getStampFrames();
+    let updated = 0;
+
+    // 各枠に紐づいた画像のメモを取得して反映
+    frames.forEach(frame => {
+      const frameUid = frame._placerUid;
+      if (!frameUid) return;
+
+      const placement = imagePlacer.placements[frameUid];
+      if (!placement) return;
+
+      const imageData = imagePlacer.images.find(i => i.id === placement.imageId);
+      if (!imageData) return;
+
+      const memo = imageData.memo || '';
+      if (memo !== (frame.stampMemo || '')) {
+        frameFactory.updateMemo(frame, memo);
+        updated++;
+      }
+    });
+
+    if (updated > 0) {
+      historyManager.saveState();
+    }
+
+    // 完了通知
+    const btn = document.getElementById('btn-sync-memo');
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg> ' + updated + '件反映';
+      btn.style.color = '#059669';
+      setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; }, 1500);
+    }
+  }
+
   // === メーカータブを動的生成（スプレッドシート連携対応） ===
   function _buildMakerTabs() {
     const makerKeys = Object.keys(FRAME_DATA.makers);
@@ -450,6 +487,22 @@
         frameFactory.duplicateSelected();
         _updateEmptyMsg();
         historyManager.saveState();
+      });
+    }
+
+    // メモを反映ボタン: 画像のメモを紐づいた枠に反映
+    const btnSyncMemo = document.getElementById('btn-sync-memo');
+    if (btnSyncMemo) {
+      btnSyncMemo.addEventListener('click', () => {
+        _syncImageMemosToFrames();
+      });
+    }
+
+    // グリッドスナップトグル
+    const snapToggle = document.getElementById('snap-toggle');
+    if (snapToggle) {
+      snapToggle.addEventListener('change', () => {
+        canvasManager.setSnapToGrid(snapToggle.checked);
       });
     }
 

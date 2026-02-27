@@ -303,6 +303,55 @@ html, body {
   transform: translateX(14px);
 }
 
+/* スナップトグル（ツールバー内） */
+.snap-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.snap-toggle-label input {
+  display: none;
+}
+
+.snap-toggle-track {
+  width: 32px;
+  height: 18px;
+  background: #d1d5db;
+  border-radius: 9px;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.snap-toggle-label input:checked + .snap-toggle-track {
+  background: #818cf8;
+}
+
+.snap-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s;
+}
+
+.snap-toggle-label input:checked + .snap-toggle-track .snap-toggle-thumb {
+  transform: translateX(14px);
+}
+
+.snap-toggle-text {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
 /* === サイドバー（スタンプ枠パネル） === */
 #sidebar {
   width: 220px;

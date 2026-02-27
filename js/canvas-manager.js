@@ -11,8 +11,9 @@ class CanvasManager {
     this.lastPanPoint = null;
     this.gridLines = [];
     this.gridVisible = true;
-    this.gridSpacing = 5; // 5mmグリッド表示（スナップは1mm）
-    this.snapGrid = 1;    // 1mmスナップ
+    this.gridSpacing = 5; // 5mmグリッド表示
+    this.snapGrid = 1;    // 1mmスナップ（デフォルト）
+    this.snapToGridEnabled = false; // グリッドスナップ（5mm）のON/OFF
 
     // Fabric.jsがキャンバスをラップする前にコンテナを記録
     this.containerEl = this.canvasEl.parentElement;
@@ -380,9 +381,15 @@ class CanvasManager {
     this.canvas.requestRenderAll();
   }
 
-  // スナップ処理（1mm単位）
+  // スナップ処理（グリッドスナップON時は5mm、OFF時は1mm）
   snapToGrid(value) {
-    return Math.round(value / this.snapGrid) * this.snapGrid;
+    const grid = this.snapToGridEnabled ? this.gridSpacing : this.snapGrid;
+    return Math.round(value / grid) * grid;
+  }
+
+  // グリッドスナップの切替
+  setSnapToGrid(enabled) {
+    this.snapToGridEnabled = enabled;
   }
 
   // 全オブジェクトのスタンプ枠を取得
