@@ -83,15 +83,14 @@ class Exporter {
     };
   }
 
-  // ファイル名生成（タイトル入力値を使用）
+  // ファイル名生成（タイトルをそのままファイル名にする）
   _getFileName(ext) {
     const titleInput = document.getElementById('title-input');
-    const title = (titleInput && titleInput.value.trim()) || '入稿データ';
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    return `Hankodori_${title}_${y}_${m}_${d}.${ext}`;
+    let title = (titleInput && titleInput.value.trim()) || '入稿データ';
+    // ファイル名に使えない文字を除去
+    title = title.replace(/[\\/:*?"<>|]/g, '');
+    if (!title) title = '入稿データ';
+    return `${title}.${ext}`;
   }
 
   // PNG エクスポート（コンテンツ領域にトリミング）
