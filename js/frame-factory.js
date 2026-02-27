@@ -134,9 +134,9 @@ class FrameFactory {
   }
 
   // 次の配置位置を計算（横方向に並べ、はみ出したら改行）
-  _getNextPosition(width, height) {
-    const maxX = FRAME_DATA.A4_WIDTH - width;
-    const maxY = FRAME_DATA.A4_HEIGHT - height;
+  // extraH: メモ等の追加高さ（mm）。省略時はサイズ表記分の4mm
+  _getNextPosition(width, height, extraH) {
+    const totalH = height + (extraH !== undefined ? extraH : 4);
 
     // 横方向に入らなければ改行
     if (this.nextX + width > FRAME_DATA.A4_WIDTH - 3) {
@@ -146,7 +146,7 @@ class FrameFactory {
     }
 
     // 縦方向もはみ出す場合は左上に戻す
-    if (this.nextY + height > FRAME_DATA.A4_HEIGHT - 3) {
+    if (this.nextY + totalH > FRAME_DATA.A4_HEIGHT - 3) {
       this.nextX = 5;
       this.nextY = 10;
       this.rowMaxHeight = 0;
@@ -157,7 +157,7 @@ class FrameFactory {
 
     // 次の位置を更新
     this.nextX += width + this.padding;
-    this.rowMaxHeight = Math.max(this.rowMaxHeight, height + 1); // サイズ表記分の高さを加算
+    this.rowMaxHeight = Math.max(this.rowMaxHeight, totalH);
 
     return { x, y };
   }
@@ -201,6 +201,19 @@ class FrameFactory {
         el.textContent = `配置数: ${count}`;
       }
     }
+  }
+
+  // メモの表示高さを計算（mm）
+  _getMemoHeight(frame) {
+    const memo = frame.stampMemo || '';
+    if (!memo) return 0;
+    const memoWidth = Math.max(frame.stampWidth, 20);
+    const fontSize = 2.2;
+    const lineHeight = fontSize * 1.3;
+    const charWidth = fontSize * 0.85; // 日本語文字の概算幅
+    const charsPerLine = Math.max(1, Math.floor(memoWidth / charWidth));
+    const numLines = Math.ceil(memo.length / charsPerLine);
+    return 3 + numLines * lineHeight; // 3mm（枠下からの距離）+ 行数分
   }
 
   // 選択中のスタンプ枠を別のスタンプに差し替え
@@ -255,11 +268,13 @@ class FrameFactory {
     this.nextY = 10;
     this.rowMaxHeight = 0;
 
-    // 各枠を再配置
+    // 各枠を再配置（メモの高さも考慮）
     frames.forEach(frame => {
       const oldLeft = frame.left;
       const oldTop = frame.top;
-      const pos = this._getNextPosition(frame.stampWidth, frame.stampHeight);
+      const memoH = this._getMemoHeight(frame);
+      const extraH = Math.max(4, memoH);
+      const pos = this._getNextPosition(frame.stampWidth, frame.stampHeight, extraH);
       frame.set({ left: pos.x, top: pos.y });
       frame.setCoords();
 

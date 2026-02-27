@@ -359,6 +359,14 @@
       border-color: rgba(139,92,246,0.15);
     }
     .btn-psd:hover { background: rgba(139,92,246,0.12); }
+
+    /* 下部バーのツールボタン（縮小版） */
+    #bar-tools .pen-toggle,
+    #bar-tools .eraser-toggle,
+    #bar-tools .lasso-toggle {
+      padding: 4px 8px;
+      font-size: 11px;
+    }
   </style>
 </head>
 <body class="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 min-h-screen">
@@ -416,7 +424,23 @@
 
   <!-- 固定下部バー -->
   <div id="bottom-bar" class="fixed-bottom-bar" style="display:none;">
-    <div id="bottom-bar-title" class="bottom-bar-title"></div>
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+      <div id="bottom-bar-title" class="bottom-bar-title" style="margin-bottom:0; flex:1;"></div>
+      <div style="display:flex; align-items:center; gap:4px;" id="bar-tools">
+        <button class="pen-toggle" id="bar-pen-btn" title="ペンモード">
+          <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z"/></svg>
+          ペン
+        </button>
+        <button class="eraser-toggle" id="bar-eraser-btn" title="消しゴムモード">
+          <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path d="M8.106 4.086a1.5 1.5 0 012.122 0l4.688 4.686a1.5 1.5 0 010 2.122L9.728 16.08a1.5 1.5 0 01-1.06.44H5.106a1.5 1.5 0 01-1.06-.44L2.106 14.14a1.5 1.5 0 010-2.122L8.106 4.086z"/></svg>
+          消しゴム
+        </button>
+        <button class="lasso-toggle" id="bar-lasso-btn" title="投げ縄モード">
+          <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z" clip-rule="evenodd"/></svg>
+          投げ縄
+        </button>
+      </div>
+    </div>
     <div class="bottom-bar-controls">
       <div>しきい値: <input type="range" id="bar-threshold" min="0" max="255" value="128"> <span id="bar-threshold-val" class="bar-val">128</span></div>
       <div>ノイズ除去: <input type="range" id="bar-noise" min="0" max="50" value="5"> <span id="bar-noise-val" class="bar-val">5px</span></div>

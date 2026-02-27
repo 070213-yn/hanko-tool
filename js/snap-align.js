@@ -140,7 +140,26 @@ class SnapAlign {
     this.cm.getCanvas().requestRenderAll();
   }
 
-  // 自動整列（同じ種類を横並び + 棚詰めでスペース有効活用）
+  // メモの表示高さを計算（mm）
+  _getMemoHeight(frame) {
+    const memo = frame.stampMemo || '';
+    if (!memo) return 0;
+    const memoWidth = Math.max(frame.stampWidth, 20);
+    const fontSize = 2.2;
+    const lineHeight = fontSize * 1.3;
+    const charWidth = fontSize * 0.85;
+    const charsPerLine = Math.max(1, Math.floor(memoWidth / charWidth));
+    const numLines = Math.ceil(memo.length / charsPerLine);
+    return 3 + numLines * lineHeight;
+  }
+
+  // 枠の実効高さ（枠高さ + サイズ表記 + メモ）を計算
+  _getEffectiveHeight(frame) {
+    const memoH = this._getMemoHeight(frame);
+    return frame.stampHeight + Math.max(4, memoH);
+  }
+
+  // 自動整列（FFDH方式: 高さ降順で棚詰め、メモ行数対応）
   autoArrange() {
     const canvas = this.cm.getCanvas();
     const frames = this.cm.getStampFrames();
@@ -149,7 +168,6 @@ class SnapAlign {
     const MARGIN = 5;       // A4端からの余白(mm)
     const TOP_MARGIN = 10;  // 上部余白（タイトル分）(mm)
     const GAP = 3;          // 枠同士の間隔(mm)
-    const LABEL_H = 6;      // サイズ表記+メモ分の高さ(mm)
     const usableW = FRAME_DATA.A4_WIDTH - MARGIN * 2;
 
     // 画像追従のため移動前の位置を記録
@@ -158,61 +176,31 @@ class SnapAlign {
       oldPositions.set(f, { left: f.left, top: f.top });
     });
 
-    // 1. スタンプID+寸法でグループ化（回転した枠は別グループとして扱う）
-    const groups = new Map();
-    frames.forEach(f => {
-      const id = `${f.stampId}_${f.stampWidth}x${f.stampHeight}`;
-      if (!groups.has(id)) {
-        groups.set(id, {
-          id: id,
-          width: f.stampWidth,
-          height: f.stampHeight,
-          frames: []
-        });
-      }
-      groups.get(id).frames.push(f);
-    });
+    // 各枠の情報を計算
+    const items = frames.map(f => ({
+      frame: f,
+      width: f.stampWidth,
+      height: f.stampHeight,
+      effectiveH: this._getEffectiveHeight(f),
+    }));
 
-    // 2. 各グループを1行に収まるブロックに分割
-    //    （同じ種類が多すぎて1行に入りきらない場合は複数ブロックに）
-    const blocks = [];
-    for (const group of groups.values()) {
-      const maxPerRow = Math.max(1, Math.floor((usableW + GAP) / (group.width + GAP)));
-      const remaining = [...group.frames];
-      while (remaining.length > 0) {
-        const chunk = remaining.splice(0, maxPerRow);
-        blocks.push({
-          id: group.id,
-          itemWidth: group.width,
-          height: group.height,
-          totalWidth: chunk.length * group.width + (chunk.length - 1) * GAP,
-          frames: chunk
-        });
-      }
-    }
-
-    // 3. ブロックを高さ降順でソート（大きい枠を先に配置するとスペース効率が上がる）
-    //    同じ高さなら幅が大きいものを先に
-    blocks.sort((a, b) => {
+    // 高さ降順でソート（同じ高さなら幅降順）→ 大きい枠を先に配置
+    items.sort((a, b) => {
       if (b.height !== a.height) return b.height - a.height;
-      return b.totalWidth - a.totalWidth;
+      return b.width - a.width;
     });
 
-    // 4. 棚詰め（Shelf Packing）
-    //    各棚は { y座標, 高さ, 残り幅 }
+    // FFDH（First Fit Decreasing Height）パッキング
     const shelves = [];
 
-    for (const block of blocks) {
-      // 既存の棚で入る場所を探す
-      // 優先順位: 高さの無駄が最も少ない棚 → 幅の無駄が最も少ない棚
+    for (const item of items) {
+      // 既存の棚で入る場所を探す（高さの無駄が最小の棚を優先）
       let bestShelf = null;
       let bestWaste = Infinity;
 
       for (const shelf of shelves) {
-        if (shelf.height >= block.height + LABEL_H && shelf.remainingW >= block.totalWidth) {
-          const heightWaste = shelf.height - block.height - LABEL_H;
-          const widthWaste = shelf.remainingW - block.totalWidth;
-          const waste = heightWaste * 10 + widthWaste;
+        if (shelf.remainingW >= item.width && shelf.height >= item.effectiveH) {
+          const waste = (shelf.height - item.effectiveH) * 10 + (shelf.remainingW - item.width);
           if (waste < bestWaste) {
             bestWaste = waste;
             bestShelf = shelf;
@@ -222,34 +210,29 @@ class SnapAlign {
 
       if (bestShelf) {
         // 既存の棚に配置
-        const startX = MARGIN + (usableW - bestShelf.remainingW);
-        block.frames.forEach((f, i) => {
-          f.set({
-            left: this.cm.snapToGrid(startX + i * (block.itemWidth + GAP)),
-            top: this.cm.snapToGrid(bestShelf.y)
-          });
-          f.setCoords();
+        const x = MARGIN + (usableW - bestShelf.remainingW);
+        item.frame.set({
+          left: this.cm.snapToGrid(x),
+          top: this.cm.snapToGrid(bestShelf.y)
         });
-        bestShelf.remainingW -= (block.totalWidth + GAP);
+        item.frame.setCoords();
+        bestShelf.remainingW -= (item.width + GAP);
       } else {
         // 新しい棚を作成
         const y = shelves.length === 0
           ? TOP_MARGIN
           : shelves[shelves.length - 1].y + shelves[shelves.length - 1].height + GAP;
 
-        // A4からはみ出す場合はそのまま配置（ユーザーが手動で調整できる）
-        block.frames.forEach((f, i) => {
-          f.set({
-            left: this.cm.snapToGrid(MARGIN + i * (block.itemWidth + GAP)),
-            top: this.cm.snapToGrid(y)
-          });
-          f.setCoords();
+        item.frame.set({
+          left: this.cm.snapToGrid(MARGIN),
+          top: this.cm.snapToGrid(y)
         });
+        item.frame.setCoords();
 
         shelves.push({
           y: y,
-          height: block.height + LABEL_H,  // サイズ表記分を加算
-          remainingW: usableW - block.totalWidth - GAP
+          height: item.effectiveH,
+          remainingW: usableW - item.width - GAP
         });
       }
     }
@@ -287,7 +270,7 @@ class SnapAlign {
     canvas.renderAll();
   }
 
-  // 配置順で自動整列（画像を配置した順に1つずつ棚に詰める）
+  // 配置順で自動整列（画像を配置した順に1つずつ棚に詰める、メモ行数対応）
   autoArrangeByOrder() {
     const canvas = this.cm.getCanvas();
     const frames = this.cm.getStampFrames();
@@ -296,7 +279,6 @@ class SnapAlign {
     const MARGIN = 5;
     const TOP_MARGIN = 10;
     const GAP = 3;
-    const LABEL_H = 6;
     const usableW = FRAME_DATA.A4_WIDTH - MARGIN * 2;
 
     // 画像追従のため移動前の位置を記録
@@ -317,17 +299,17 @@ class SnapAlign {
       return timeA - timeB;
     });
 
-    // 棚詰め（1つずつ順番に配置）
+    // 棚詰め（1つずつ順番に配置、メモ高さ対応）
     const shelves = [];
 
     for (const frame of sortedFrames) {
       const fw = frame.stampWidth;
-      const fh = frame.stampHeight;
+      const effectiveH = this._getEffectiveHeight(frame);
 
-      // 既存の棚で入る場所を探す（最後の棚から優先）
+      // 既存の棚で入る場所を探す
       let bestShelf = null;
       for (const shelf of shelves) {
-        if (shelf.height >= fh + LABEL_H && shelf.remainingW >= fw) {
+        if (shelf.height >= effectiveH && shelf.remainingW >= fw) {
           bestShelf = shelf;
           break;
         }
@@ -355,7 +337,7 @@ class SnapAlign {
 
         shelves.push({
           y: y,
-          height: fh + LABEL_H,
+          height: effectiveH,
           remainingW: usableW - fw - GAP
         });
       }

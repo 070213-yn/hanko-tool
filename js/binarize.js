@@ -321,6 +321,14 @@
 
     toolSlider.value = img.toolSize;
     document.getElementById('bar-tool-size-val').textContent = img.toolSize;
+
+    // 下部バーのツールボタン状態を同期
+    const barPen = document.getElementById('bar-pen-btn');
+    const barEraser = document.getElementById('bar-eraser-btn');
+    const barLasso = document.getElementById('bar-lasso-btn');
+    if (barPen) barPen.classList.toggle('active', !!img.penActive);
+    if (barEraser) barEraser.classList.toggle('active', !!img.eraserActive);
+    if (barLasso) barLasso.classList.toggle('active', !!img.lassoActive);
   }
 
   // === 下部バースライダーイベント ===
@@ -352,6 +360,20 @@
       document.getElementById('bar-tool-size-val').textContent = img.toolSize;
       // 太さインジケーター表示
       _showSizeIndicator(img);
+    });
+
+    // 下部バーのツールボタンイベント
+    document.getElementById('bar-pen-btn').addEventListener('click', () => {
+      const img = images.find(i => i.id === selectedImageId);
+      if (img) { _activateTool(img, 'pen'); _syncBottomBar(); }
+    });
+    document.getElementById('bar-eraser-btn').addEventListener('click', () => {
+      const img = images.find(i => i.id === selectedImageId);
+      if (img) { _activateTool(img, 'eraser'); _syncBottomBar(); }
+    });
+    document.getElementById('bar-lasso-btn').addEventListener('click', () => {
+      const img = images.find(i => i.id === selectedImageId);
+      if (img) { _activateTool(img, 'lasso'); _syncBottomBar(); }
     });
   }
 
@@ -848,13 +870,9 @@
   // === ダウンロード ===
   function _downloadSingle(imageObj) {
     const trimmed = _trimTransparent(imageObj.previewCanvas);
-    const dataURL = trimmed.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.download = _makeFileName(imageObj.fileName);
-    link.href = dataURL;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    trimmed.toBlob((blob) => {
+      _triggerDownload(blob, _makeFileName(imageObj.fileName));
+    }, 'image/png');
   }
 
   async function _downloadAllAsZip() {
@@ -876,14 +894,7 @@
       const y = now.getFullYear();
       const m = String(now.getMonth() + 1).padStart(2, '0');
       const d = String(now.getDate()).padStart(2, '0');
-      const url = URL.createObjectURL(content);
-      const link = document.createElement('a');
-      link.download = `二値化_${y}_${m}_${d}.zip`;
-      link.href = url;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      _triggerDownload(content, `二値化_${y}_${m}_${d}.zip`);
     } catch (e) {
       console.error('ZIPエクスポートエラー:', e);
       alert('ZIPファイルの作成に失敗しました。個別にダウンロードしてください。');
@@ -896,6 +907,25 @@
   function _makeFileName(originalName) {
     const baseName = originalName.replace(/\.[^.]+$/, '');
     return `${baseName}_二値化.png`;
+  }
+
+  // iPad Safari対応のダウンロードヘルパー
+  function _triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    // iPad Safari対応: setTimeout で確実にクリックイベントを発火
+    setTimeout(() => {
+      link.click();
+      // URL失効を遅延させてダウンロード完了を待つ
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 3000);
+    }, 0);
   }
 
   // === PSD書出し ===
@@ -957,18 +987,11 @@
 
       const result = agPsd.writePsd(psd);
       const blob = new Blob([result], { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
       const now = new Date();
       const y = now.getFullYear();
       const m = String(now.getMonth() + 1).padStart(2, '0');
       const d = String(now.getDate()).padStart(2, '0');
-      link.download = `二値化_${dpi}DPI_${y}_${m}_${d}.psd`;
-      link.href = url;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      _triggerDownload(blob, `二値化_${dpi}DPI_${y}_${m}_${d}.psd`);
     } catch (e) {
       console.error('PSD書出しエラー:', e);
       alert('PSD書出しに失敗しました。\n' + e.message);
@@ -1077,6 +1100,26 @@
       }
     }
     ctx.putImageData(output, 0, 0);
+  }
+
+  // === Visual Viewport API: iPad拡大時に下部バーを画面下部に固定 ===
+  function _updateBottomBarPosition() {
+    const bar = document.getElementById('bottom-bar');
+    if (!bar || bar.style.display === 'none') return;
+
+    if (window.visualViewport) {
+      const vv = window.visualViewport;
+      bar.style.position = 'fixed';
+      bar.style.bottom = 'auto';
+      bar.style.left = vv.offsetLeft + 'px';
+      bar.style.top = (vv.offsetTop + vv.height - bar.offsetHeight) + 'px';
+      bar.style.width = vv.width + 'px';
+    }
+  }
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', _updateBottomBarPosition);
+    window.visualViewport.addEventListener('scroll', _updateBottomBarPosition);
   }
 
 })();
