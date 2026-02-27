@@ -219,6 +219,9 @@ class FrameFactory {
     const frames = this.cm.getStampFrames();
     if (frames.length === 0) return;
 
+    // キャンバス上の配置済み画像を取得（_linkedFrameUidで枠と紐づいている）
+    const placedImages = canvas.getObjects().filter(o => o.isPlacedImage);
+
     // 現在の位置順でソート（上→下、同じ行なら左→右）
     frames.sort((a, b) => {
       if (Math.abs(a.top - b.top) > 5) return a.top - b.top;
@@ -238,26 +241,30 @@ class FrameFactory {
       frame.set({ left: pos.x, top: pos.y });
       frame.setCoords();
 
-      // 配置済み画像をフレームと同じ距離だけ移動
-      if (window.imagePlacer) {
-        const dx = pos.x - oldLeft;
-        const dy = pos.y - oldTop;
-        if (dx !== 0 || dy !== 0) {
-          const uid = window.imagePlacer._getFrameUid(frame);
-          const placement = window.imagePlacer.placements[uid];
-          if (placement) {
-            placement.fabricImg.set({
-              left: placement.fabricImg.left + dx,
-              top: placement.fabricImg.top + dy,
+      const dx = pos.x - oldLeft;
+      const dy = pos.y - oldTop;
+      if (dx === 0 && dy === 0) return;
+
+      // この枠に紐づく画像をキャンバスから直接探して移動
+      const frameUid = frame._placerUid;
+      if (!frameUid) return;
+
+      placedImages.forEach(img => {
+        if (img._linkedFrameUid === frameUid) {
+          img.set({
+            left: img.left + dx,
+            top: img.top + dy,
+          });
+          // clipPathも同じ距離だけ移動
+          if (img.clipPath) {
+            img.clipPath.set({
+              left: img.clipPath.left + dx,
+              top: img.clipPath.top + dy,
             });
-            placement.clipRect.set({
-              left: placement.clipRect.left + dx,
-              top: placement.clipRect.top + dy,
-            });
-            placement.fabricImg.setCoords();
           }
+          img.setCoords();
         }
-      }
+      });
     });
 
     canvas.requestRenderAll();
