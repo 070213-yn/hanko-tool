@@ -31,8 +31,8 @@ class SheetFetcher {
   }
 
   // CSVをパースして行配列に変換
-  // 列: ID, 横mm, 縦mm
-  // 戻り値: [{ id, width, height }, ...]
+  // 列: ID, 横mm, 縦mm, 余白mm(任意)
+  // 戻り値: [{ id, width, height, margin? }, ...]
   _parseCSV(csv) {
     const lines = csv.split('\n').filter(line => line.trim());
     if (lines.length < 2) return [];
@@ -45,11 +45,16 @@ class SheetFetcher {
       const id = cols[0].trim();
       const width = parseInt(cols[1], 10);
       const height = parseInt(cols[2], 10);
+      const margin = cols.length >= 4 ? parseInt(cols[3], 10) : null;
 
       if (!id || !width || !height) continue;
       if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) continue;
 
-      rows.push({ id, width, height });
+      const stamp = { id, width, height };
+      if (margin !== null && !isNaN(margin) && margin >= 0) {
+        stamp.margin = margin;
+      }
+      rows.push(stamp);
     }
     return rows;
   }

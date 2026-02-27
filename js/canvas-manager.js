@@ -28,6 +28,7 @@ class CanvasManager {
       preserveObjectStacking: true,
       stopContextMenu: true,
       fireRightClick: true,
+      fireMiddleClick: true,  // 中ボタンイベントを有効化（パン用）
     });
 
     this._fitToContainer();
@@ -180,14 +181,16 @@ class CanvasManager {
     });
   }
 
-  // Alt+ドラッグでパン
+  // Alt+ドラッグ または 中ボタン+ドラッグでパン
   _setupPan() {
     this.canvas.on('mouse:down', (opt) => {
       if (opt.e.altKey || opt.e.button === 1) {
         this.isPanning = true;
         this.lastPanPoint = { x: opt.e.clientX, y: opt.e.clientY };
         this.canvas.selection = false;
-        this.canvas.defaultCursor = 'grab';
+        this.canvas.defaultCursor = 'grabbing';
+        this.canvas.setCursor('grabbing');
+        opt.e.preventDefault();  // 中ボタンの自動スクロールを防止
       }
     });
 
@@ -209,6 +212,15 @@ class CanvasManager {
         this.lastPanPoint = null;
         this.canvas.selection = true;
         this.canvas.defaultCursor = 'default';
+        this.canvas.setCursor('default');
+      }
+    });
+
+    // 中ボタンの自動スクロール防止（ブラウザのデフォルト動作を抑制）
+    const wrapper = this.canvas.wrapperEl || this.containerEl;
+    wrapper.addEventListener('mousedown', (e) => {
+      if (e.button === 1) {
+        e.preventDefault();
       }
     });
   }

@@ -13,7 +13,8 @@ class FrameFactory {
   // posOverride: { left, top } を渡すと自動配置の代わりにその位置に配置
   createFrame(stamp, category, posOverride) {
     const { width, height } = stamp;
-    const margin = category.margin;
+    // スタンプ個別の余白があればそちらを優先、なければカテゴリの余白を使用
+    const margin = (stamp.margin !== undefined && stamp.margin !== null) ? stamp.margin : category.margin;
 
     // 内枠（印面サイズ）- 赤破線
     const innerW = width - margin * 2;
@@ -79,6 +80,7 @@ class FrameFactory {
       stampId: stamp.id,
       stampWidth: width,
       stampHeight: height,
+      stampMargin: margin,
       categoryName: category.name,
       _category: category,
     });

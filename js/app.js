@@ -57,6 +57,7 @@
     _setupMobilePanel();
     _setupKeyboard();
     _setupHint();
+    _setupStampToggle();
     _setupImagePlacer();
     _setupHistory();
     _setupDragDrop();
@@ -85,6 +86,18 @@
         hint.classList.add('hidden');
       });
     }
+  }
+
+  // === スタンプ枠セクション折りたたみ ===
+  function _setupStampToggle() {
+    const toggle = document.getElementById('stamp-section-toggle');
+    const body = document.getElementById('stamp-section-body');
+    if (!toggle || !body) return;
+
+    toggle.addEventListener('click', () => {
+      toggle.classList.toggle('collapsed');
+      body.classList.toggle('collapsed');
+    });
   }
 
   // === メーカータブを動的生成（スプレッドシート連携対応） ===
@@ -159,7 +172,7 @@
 
     // 図形表示の基準サイズ計算
     const maxDim = Math.max(...stamps.map(s => Math.max(s.width, s.height)));
-    const SHAPE_MAX_PX = 48; // 最大48px
+    const SHAPE_MAX_PX = 64; // 最大64px（48から拡大）
     const scale = SHAPE_MAX_PX / maxDim;
 
     // PC用サイドバー

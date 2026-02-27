@@ -120,9 +120,9 @@ class ImagePlacer {
     // 既にこの枠に画像があれば削除
     this._removeImageFromFrame(frame);
 
-    // 枠の内枠サイズを取得
+    // 枠の内枠サイズを取得（スタンプ個別の余白があればそちらを優先）
     const category = frame._category;
-    const margin = category.margin;
+    const margin = frame.stampMargin !== undefined ? frame.stampMargin : category.margin;
     const stampW = frame.stampWidth;
     const stampH = frame.stampHeight;
     const innerW = stampW - margin * 2;
@@ -321,9 +321,9 @@ class ImagePlacer {
     const imageData = this.images.find(i => i.id === placement.imageId);
     if (!imageData) return false;
 
-    // 枠の内枠サイズを計算
+    // 枠の内枠サイズを計算（スタンプ個別の余白があればそちらを優先）
     const category = frame._category;
-    const margin = category.margin;
+    const margin = frame.stampMargin !== undefined ? frame.stampMargin : category.margin;
     const innerW = frame.stampWidth - margin * 2;
     const innerH = frame.stampHeight - margin * 2;
     const imagePadding = 0.5;

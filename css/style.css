@@ -487,6 +487,41 @@ html, body {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
+/* 折りたたみ可能なセクションラベル */
+.section-label-toggle {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+}
+
+.section-label-toggle:hover {
+  color: #6366f1;
+}
+
+.toggle-chevron {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  transition: transform 0.2s;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.section-label-toggle.collapsed .toggle-chevron {
+  transform: rotate(-90deg);
+}
+
+#stamp-section-body {
+  transition: max-height 0.3s ease, opacity 0.2s;
+  overflow: hidden;
+}
+
+#stamp-section-body.collapsed {
+  max-height: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* === 差し替えヒント === */
 .replace-hint {
   font-size: 10px;
