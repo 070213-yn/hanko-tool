@@ -135,7 +135,7 @@ class FrameFactory {
 
     // 次の位置を更新
     this.nextX += width + this.padding;
-    this.rowMaxHeight = Math.max(this.rowMaxHeight, height + 3); // サイズ表記分の高さを加算
+    this.rowMaxHeight = Math.max(this.rowMaxHeight, height + 2); // サイズ表記分の高さを加算
 
     return { x, y };
   }
