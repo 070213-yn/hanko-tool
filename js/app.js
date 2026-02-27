@@ -369,6 +369,16 @@
       });
     }
 
+    // 複製
+    const btnDuplicate = document.getElementById('btn-duplicate');
+    if (btnDuplicate) {
+      btnDuplicate.addEventListener('click', () => {
+        frameFactory.duplicateSelected();
+        _updateEmptyMsg();
+        historyManager.saveState();
+      });
+    }
+
     // モバイル用ボタン
     const mobileRotate = document.getElementById('mobile-btn-rotate');
     if (mobileRotate) {

@@ -305,40 +305,76 @@ html, body {
 
 /* === サイドバー === */
 #sidebar {
-  width: 420px;
+  width: 220px;
   flex-shrink: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-/* 2列レイアウト */
-.sidebar-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.sidebar-col {
-  min-width: 0;
+/* === 右ツールバー === */
+#toolbar {
+  width: 180px;
+  flex-shrink: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-/* 右カラム内のボタンサイズ調整 */
-.sidebar-col .action-buttons {
+.toolbar-inner {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border-left: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.toolbar-inner::-webkit-scrollbar {
+  width: 4px;
+}
+.toolbar-inner::-webkit-scrollbar-track {
+  background: transparent;
+}
+.toolbar-inner::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 2px;
+}
+
+.toolbar-section {
+  margin-bottom: 12px;
+}
+
+/* ツールバー内のボタン調整 */
+#toolbar .action-buttons {
   gap: 4px;
 }
 
-.sidebar-col .action-btn {
+#toolbar .action-btn {
   padding: 7px 8px;
   font-size: 11px;
   gap: 4px;
 }
 
-.sidebar-col .action-btn svg {
+#toolbar .action-btn svg {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
+}
+
+#toolbar .align-grid {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+#toolbar .align-btn {
+  padding: 6px 2px;
+}
+
+#toolbar .section-label {
+  margin-bottom: 6px;
 }
 
 .sidebar-inner {
@@ -1051,6 +1087,10 @@ html, body {
 /* === レスポンシブ: モバイル === */
 @media (max-width: 767px) {
   #sidebar {
+    display: none;
+  }
+
+  #toolbar {
     display: none;
   }
 

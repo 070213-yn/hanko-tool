@@ -325,6 +325,39 @@ class FrameFactory {
     canvas.requestRenderAll();
   }
 
+  // 選択中のスタンプ枠を複製（自動配置位置に新しい枠を作成）
+  duplicateSelected() {
+    const canvas = this.cm.getCanvas();
+    const activeObjects = canvas.getActiveObjects();
+    const frames = activeObjects.filter(o => o.isStampFrame);
+    if (frames.length === 0) return;
+
+    canvas.discardActiveObject();
+
+    const newFrames = [];
+    frames.forEach(frame => {
+      const stamp = {
+        id: frame.stampId,
+        width: frame.stampWidth,
+        height: frame.stampHeight,
+      };
+      const cat = frame._category;
+      // 自動配置位置に新しい枠を作成（posOverrideなし）
+      const newFrame = this.createFrame(stamp, cat);
+      newFrames.push(newFrame);
+    });
+
+    // 新しい枠を選択状態に
+    if (newFrames.length === 1) {
+      canvas.setActiveObject(newFrames[0]);
+    } else if (newFrames.length > 1) {
+      const sel = new fabric.ActiveSelection(newFrames, { canvas });
+      canvas.setActiveObject(sel);
+    }
+
+    canvas.requestRenderAll();
+  }
+
   // 選択中のオブジェクトを削除
   deleteSelected() {
     const canvas = this.cm.getCanvas();

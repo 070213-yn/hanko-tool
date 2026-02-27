@@ -140,26 +140,20 @@
             <div class="maker-tab-indicator"></div>
           </div>
 
-          <!-- 2列レイアウト -->
-          <div class="sidebar-columns">
-            <!-- 左カラム: スタンプ枠 -->
-            <div class="sidebar-col">
-              <div class="sidebar-section">
-                <div class="section-label">
-                  <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-                    <path d="M2 4.25A2.25 2.25 0 014.25 2h11.5A2.25 2.25 0 0118 4.25v8.5A2.25 2.25 0 0115.75 15h-3.105a3.501 3.501 0 001.1 1.677A.75.75 0 0113.26 18H6.74a.75.75 0 01-.484-1.323A3.501 3.501 0 007.355 15H4.25A2.25 2.25 0 012 12.75v-8.5z"/>
-                  </svg>
-                  スタンプ枠
-                </div>
-                <div id="replace-hint" class="replace-hint hidden">長押しで差し替え（PCはShift+クリック）</div>
-                <div id="stamp-list">
-                  <!-- JSで動的生成 -->
-                </div>
-              </div>
+          <!-- スタンプ枠 -->
+          <div class="sidebar-section">
+            <div class="section-label">
+              <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                <path d="M2 4.25A2.25 2.25 0 014.25 2h11.5A2.25 2.25 0 0118 4.25v8.5A2.25 2.25 0 0115.75 15h-3.105a3.501 3.501 0 001.1 1.677A.75.75 0 0113.26 18H6.74a.75.75 0 01-.484-1.323A3.501 3.501 0 007.355 15H4.25A2.25 2.25 0 012 12.75v-8.5z"/>
+              </svg>
+              スタンプ枠
             </div>
+            <div id="replace-hint" class="replace-hint hidden">長押しで差し替え（PCはShift+クリック）</div>
+            <div id="stamp-list">
+              <!-- JSで動的生成 -->
+            </div>
+          </div>
 
-            <!-- 右カラム: ツール -->
-            <div class="sidebar-col">
           <!-- 画像を配置 -->
           <div class="sidebar-section">
             <div class="section-label">
@@ -180,9 +174,29 @@
               <span>枠をクリックして画像を配置</span>
             </div>
           </div>
+        </div>
+      </aside>
 
+      <!-- キャンバスエリア -->
+      <div id="canvas-area">
+        <div id="canvas-container">
+          <canvas id="main-canvas"></canvas>
+        </div>
+        <!-- キャンバス上の空状態メッセージ -->
+        <div id="canvas-empty-msg" class="canvas-empty-msg">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="w-12 h-12 text-gray-300">
+            <path d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <p class="text-sm text-gray-400 mt-2">左のパネルからスタンプ枠を追加してください</p>
+          <p class="text-xs text-gray-300 mt-1">ボタンをクリックするとここに枠が配置されます</p>
+        </div>
+      </div>
+
+      <!-- 右ツールバー -->
+      <aside id="toolbar">
+        <div class="toolbar-inner">
           <!-- 整列ツール -->
-          <div class="sidebar-section">
+          <div class="toolbar-section">
             <div class="section-label">
               <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
                 <path fill-rule="evenodd" d="M2 3.75A.75.75 0 012.75 3h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 3.75zm0 4.167a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75zm0 4.166a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75zm0 4.167a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75z" clip-rule="evenodd"/>
@@ -248,8 +262,19 @@
             </div>
           </div>
 
+          <!-- 複製ボタン（新機能）-->
+          <div class="toolbar-section">
+            <button id="btn-duplicate" class="rotate-btn w-full" title="選択した枠を複製">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
+                <rect x="8" y="8" width="12" height="12" rx="2"/>
+                <path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>
+              </svg>
+              複製
+            </button>
+          </div>
+
           <!-- アクションボタン -->
-          <div class="sidebar-section">
+          <div class="toolbar-section">
             <div class="action-buttons">
               <button id="btn-delete-selected" class="action-btn glass-danger" disabled>
                 <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5z" clip-rule="evenodd"/></svg>
@@ -287,25 +312,8 @@
             <span class="frame-counter-num">0</span>
             <span>枠を配置中</span>
           </div>
-            </div><!-- /sidebar-col (右カラム) -->
-          </div><!-- /sidebar-columns -->
         </div>
       </aside>
-
-      <!-- キャンバスエリア -->
-      <div id="canvas-area">
-        <div id="canvas-container">
-          <canvas id="main-canvas"></canvas>
-        </div>
-        <!-- キャンバス上の空状態メッセージ -->
-        <div id="canvas-empty-msg" class="canvas-empty-msg">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="w-12 h-12 text-gray-300">
-            <path d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          <p class="text-sm text-gray-400 mt-2">左のパネルからスタンプ枠を追加してください</p>
-          <p class="text-xs text-gray-300 mt-1">ボタンをクリックするとここに枠が配置されます</p>
-        </div>
-      </div>
     </div>
 
     <!-- ズームバー -->
