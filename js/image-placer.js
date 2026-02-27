@@ -12,9 +12,17 @@ class ImagePlacer {
 
   // === ファイルアップロードから画像をインポート ===
   importFiles(fileList) {
-    const imageFiles = Array.from(fileList).filter(f => f.type.startsWith('image/'));
-    if (imageFiles.length === 0) return;
+    const files = Array.from(fileList);
 
+    // PSDファイルを分離
+    const psdFiles = files.filter(f => f.name.toLowerCase().endsWith('.psd'));
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+
+    // PSDファイルを処理
+    psdFiles.forEach(f => this._importPSD(f));
+
+    // 通常画像を処理
+    if (imageFiles.length === 0) return;
     let loaded = 0;
     imageFiles.forEach(file => {
       const reader = new FileReader();
@@ -31,9 +39,17 @@ class ImagePlacer {
 
   // === ファイルインポート完了後にコールバック（D&D用） ===
   importFilesWithCallback(fileList, callback) {
-    const imageFiles = Array.from(fileList).filter(f => f.type.startsWith('image/'));
-    if (imageFiles.length === 0) return;
+    const files = Array.from(fileList);
 
+    // PSDファイルを分離
+    const psdFiles = files.filter(f => f.name.toLowerCase().endsWith('.psd'));
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+
+    // PSDファイルを処理
+    psdFiles.forEach(f => this._importPSD(f, callback));
+
+    // 通常画像を処理
+    if (imageFiles.length === 0) return;
     let loaded = 0;
     const addedIds = [];
     imageFiles.forEach(file => {
@@ -48,6 +64,59 @@ class ImagePlacer {
         }
       };
       reader.readAsDataURL(file);
+    });
+  }
+
+  // === PSDファイルを読み込み、各レイヤーを画像として追加 ===
+  _importPSD(file, callback) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const psd = agPsd.readPsd(new Uint8Array(e.target.result));
+        const addedIds = [];
+
+        // レイヤーを再帰的に走査して画像を追加
+        this._extractLayers(psd.children || [], addedIds, '');
+
+        if (addedIds.length === 0) {
+          console.warn('PSDからレイヤーが見つかりませんでした');
+          return;
+        }
+
+        console.log(`PSD「${file.name}」から ${addedIds.length} レイヤーをインポート`);
+        this.renderList();
+
+        if (callback && addedIds.length > 0) {
+          callback(addedIds[0]);
+        }
+      } catch (err) {
+        console.error('PSD読み込みエラー:', err);
+        alert('PSDファイルの読み込みに失敗しました。');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // レイヤーを再帰的に走査（グループ対応）
+  _extractLayers(layers, addedIds, prefix) {
+    layers.forEach(layer => {
+      // 非表示レイヤーはスキップ
+      if (layer.hidden) return;
+
+      // グループの場合は再帰的に子レイヤーを処理
+      if (layer.children && layer.children.length > 0) {
+        const groupPrefix = prefix ? `${prefix}/${layer.name || 'グループ'}` : (layer.name || 'グループ');
+        this._extractLayers(layer.children, addedIds, groupPrefix);
+        return;
+      }
+
+      // キャンバスがあるレイヤーを画像として追加
+      if (layer.canvas) {
+        const layerName = prefix ? `${prefix}/${layer.name || 'レイヤー'}` : (layer.name || 'レイヤー');
+        const dataURL = layer.canvas.toDataURL('image/png');
+        const id = this._addImage(layerName, dataURL);
+        addedIds.push(id);
+      }
     });
   }
 
