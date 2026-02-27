@@ -132,7 +132,12 @@ class ImagePlacer {
 
       items.forEach(item => {
         if (item.name && item.dataURL) {
-          this._addImage(item.name, item.dataURL);
+          const id = this._addImage(item.name, item.dataURL);
+          // 二値化ツールから転送されたメモを反映
+          if (item.memo) {
+            const imgData = this.images.find(i => i.id === id);
+            if (imgData) imgData.memo = item.memo;
+          }
         }
       });
 

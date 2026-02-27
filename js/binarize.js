@@ -91,6 +91,7 @@
           toolSize: 20,
           noiseSize: 5,
           applied: false, // 変更適用済みフラグ
+          memo: '',  // メモ（入稿ツールに転送される）
         };
 
         _applyBinarize(imageObj);
@@ -170,6 +171,12 @@
           </div>
         </div>
       </div>
+      <div style="margin-top:6px; display:flex; align-items:center; gap:6px;">
+        <span class="text-xs text-gray-400 font-medium" style="white-space:nowrap;">メモ:</span>
+        <input type="text" class="memo-input" id="memo-input-${imageObj.id}" data-id="${imageObj.id}"
+          placeholder="メモを入力..." value="${_escapeHtml(imageObj.memo)}"
+          style="flex:1; padding:4px 8px; font-size:12px; border:1px solid rgba(0,0,0,0.1); border-radius:6px; outline:none; background:rgba(255,255,255,0.6); font-family:'Noto Sans JP',sans-serif;">
+      </div>
       <div class="controls-row" style="display:none;">
       </div>
     `;
@@ -191,6 +198,18 @@
 
     // ツールイベントの設定
     _setupDrawingTools(imageObj);
+
+    // メモ入力イベント
+    const memoInput = card.querySelector('.memo-input');
+    if (memoInput) {
+      memoInput.addEventListener('input', (e) => {
+        imageObj.memo = e.target.value;
+      });
+      // クリック時にカード選択を防止
+      memoInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    }
 
     // カードクリックで選択
     card.addEventListener('click', (e) => {
@@ -853,6 +872,7 @@
       return {
         name: _makeFileName(img.fileName),
         dataURL: trimmed.toDataURL('image/png'),
+        memo: img.memo || '',
       };
     });
 

@@ -286,7 +286,7 @@
             </div>
           </div>
 
-          <!-- 複製・メモ反映 -->
+          <!-- 複製・画像削除・メモ -->
           <div class="toolbar-section">
             <button id="btn-duplicate" class="rotate-btn w-full" title="選択した枠を複製">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
@@ -295,12 +295,23 @@
               </svg>
               複製
             </button>
+            <button id="btn-remove-placed-image" class="rotate-btn w-full mt-1.5" style="color:#dc2626;" title="選択した枠の配置済み画像を削除（枠はそのまま残る）">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
+                <path d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+              配置画像を削除
+            </button>
             <button id="btn-sync-memo" class="rotate-btn w-full mt-1.5" title="画像のメモを枠に反映">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
                 <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
               </svg>
               メモを反映
             </button>
+            <div id="memo-edit-wrap" style="display:none; margin-top:6px;">
+              <label class="text-xs text-gray-500 font-medium" style="display:block; margin-bottom:3px;">選択枠のメモ:</label>
+              <input type="text" id="memo-edit-input" placeholder="メモを入力..."
+                style="width:100%; padding:5px 8px; font-size:12px; border:1px solid rgba(0,0,0,0.12); border-radius:6px; outline:none; background:rgba(255,255,255,0.7); font-family:'Noto Sans JP',sans-serif;">
+            </div>
           </div>
 
           <!-- グリッドスナップ -->

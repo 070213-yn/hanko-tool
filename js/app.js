@@ -490,12 +490,71 @@
       });
     }
 
+    // 配置画像削除ボタン: 選択枠の画像だけ削除（枠は残す）
+    const btnRemovePlacedImage = document.getElementById('btn-remove-placed-image');
+    if (btnRemovePlacedImage) {
+      btnRemovePlacedImage.addEventListener('click', () => {
+        const canvas = canvasManager.getCanvas();
+        const active = canvas.getActiveObjects().filter(o => o.isStampFrame);
+        if (active.length === 0) return;
+        active.forEach(frame => {
+          if (window.imagePlacer) {
+            window.imagePlacer.removeFromFrame(frame);
+          }
+        });
+        canvas.requestRenderAll();
+        historyManager.saveState();
+      });
+    }
+
     // メモを反映ボタン: 画像のメモを紐づいた枠に反映
     const btnSyncMemo = document.getElementById('btn-sync-memo');
     if (btnSyncMemo) {
       btnSyncMemo.addEventListener('click', () => {
         _syncImageMemosToFrames();
       });
+    }
+
+    // 選択枠メモ入力欄: 選択状態に連動
+    const memoEditInput = document.getElementById('memo-edit-input');
+    const memoEditWrap = document.getElementById('memo-edit-wrap');
+    if (memoEditInput && memoEditWrap) {
+      memoEditInput.addEventListener('input', () => {
+        const canvas = canvasManager.getCanvas();
+        const active = canvas.getActiveObject();
+        if (active && active.isStampFrame) {
+          frameFactory.updateMemo(active, memoEditInput.value);
+        }
+      });
+      // Enterキーでフォーカスを外す
+      memoEditInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          memoEditInput.blur();
+          historyManager.saveState();
+        }
+      });
+      // フォーカスを外したら状態保存
+      memoEditInput.addEventListener('blur', () => {
+        historyManager.saveState();
+      });
+
+      // 選択変更時にメモ欄を同期
+      canvasManager.getCanvas().on('selection:created', _syncMemoEditUI);
+      canvasManager.getCanvas().on('selection:updated', _syncMemoEditUI);
+      canvasManager.getCanvas().on('selection:cleared', () => {
+        memoEditWrap.style.display = 'none';
+      });
+    }
+
+    function _syncMemoEditUI() {
+      const canvas = canvasManager.getCanvas();
+      const active = canvas.getActiveObject();
+      if (active && active.isStampFrame) {
+        memoEditWrap.style.display = 'block';
+        memoEditInput.value = active.stampMemo || '';
+      } else {
+        memoEditWrap.style.display = 'none';
+      }
     }
 
     // グリッドスナップトグル
