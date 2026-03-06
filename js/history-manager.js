@@ -78,6 +78,8 @@ class HistoryManager {
       categoryName: entry.category.name,
       placedImageId: entry.placedImageId,
       imageState: entry.imageState,
+      placementOrder: entry.placementOrder,
+      placementTime: entry.placementTime,
     }));
 
     // 画像データも保存
@@ -144,6 +146,11 @@ class HistoryManager {
           top: entry.top,
         });
 
+        // 配置順を復元
+        if (entry.placementOrder !== undefined) {
+          newFrame._placementOrder = entry.placementOrder;
+        }
+
         // 枠メモの復元
         if (entry.stampMemo) {
           this.frameFactory.updateMemo(newFrame, entry.stampMemo);
@@ -156,6 +163,14 @@ class HistoryManager {
             imageId: mappedId,
             imageState: entry.imageState || null,
           });
+          // 配置時刻も復元
+          if (entry.placementTime) {
+            const uid = this.imagePlacer._getFrameUid(newFrame);
+            const placement = this.imagePlacer.placements[uid];
+            if (placement) {
+              placement.placementTime = entry.placementTime;
+            }
+          }
         }
       });
       this._isRestoring = false;
@@ -198,6 +213,14 @@ class HistoryManager {
         }
       }
 
+      // 配置順と配置時刻を保存（undo/redo後も配置順整列が正しく動くように）
+      let placementTime = null;
+      if (this.imagePlacer) {
+        const uid = this.imagePlacer._getFrameUid(frame);
+        const pl = this.imagePlacer.placements[uid];
+        if (pl) placementTime = pl.placementTime;
+      }
+
       return {
         stampId: frame.stampId,
         stampWidth: frame.stampWidth,
@@ -208,6 +231,8 @@ class HistoryManager {
         category: frame._category,
         placedImageId: placedImageId,
         imageState: imageState,
+        placementOrder: frame._placementOrder || 0,
+        placementTime: placementTime,
       };
     });
   }
@@ -240,6 +265,11 @@ class HistoryManager {
         top: entry.top,
       });
 
+      // 配置順を復元（createFrameで新しい値が割り振られるので上書き）
+      if (entry.placementOrder !== undefined) {
+        newFrame._placementOrder = entry.placementOrder;
+      }
+
       // 枠メモの復元
       if (entry.stampMemo) {
         this.frameFactory.updateMemo(newFrame, entry.stampMemo);
@@ -251,11 +281,22 @@ class HistoryManager {
           imageId: entry.placedImageId,
           imageState: entry.imageState,
         });
+        // 配置時刻も復元（placementTimeがリセットされるのを防ぐ）
+        if (entry.placementTime) {
+          const uid = this.imagePlacer._getFrameUid(newFrame);
+          const placement = this.imagePlacer.placements[uid];
+          if (placement) {
+            placement.placementTime = entry.placementTime;
+          }
+        }
       }
     });
 
     // FrameFactoryの配置カウンターを復元後の枠位置に合わせて再計算
     this.frameFactory.recalcNextPosition();
+    // placementCounterも復元後の最大値+1に更新
+    const maxOrder = Math.max(0, ...this.canvasManager.getStampFrames().map(f => f._placementOrder || 0));
+    this.frameFactory.placementCounter = maxOrder + 1;
 
     canvas.discardActiveObject();
     canvas.requestRenderAll();

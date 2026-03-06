@@ -292,16 +292,22 @@ class SnapAlign {
       oldPositions.set(f, { left: f.left, top: f.top });
     });
 
-    // 配置時刻でソート（画像が配置されていない枠は末尾に）
+    // 配置順カウンターでソート（画像が配置されていない枠は末尾に）
     const imagePlacer = window.imagePlacer;
     const sortedFrames = [...frames].sort((a, b) => {
       const uidA = a._placerUid;
       const uidB = b._placerUid;
       const pA = uidA && imagePlacer ? imagePlacer.placements[uidA] : null;
       const pB = uidB && imagePlacer ? imagePlacer.placements[uidB] : null;
-      const timeA = pA ? (pA.placementTime || 0) : Infinity;
-      const timeB = pB ? (pB.placementTime || 0) : Infinity;
-      return timeA - timeB;
+      // 画像が配置されていない枠は末尾に
+      const hasA = !!pA;
+      const hasB = !!pB;
+      if (hasA !== hasB) return hasA ? -1 : 1;
+      // 両方配置済みなら _placementOrder（枠の作成順）でソート
+      // _placementOrder は undo/redo でも保持される安定した値
+      const orderA = a._placementOrder !== undefined ? a._placementOrder : Infinity;
+      const orderB = b._placementOrder !== undefined ? b._placementOrder : Infinity;
+      return orderA - orderB;
     });
 
     // 厳密な左→右フロー配置（現在の行のみに配置、前の行には戻らない）

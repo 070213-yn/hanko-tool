@@ -7,6 +7,7 @@ class FrameFactory {
     this.nextY = 10; // 次に配置するY座標（mm）タイトル分の余白確保
     this.rowMaxHeight = 0; // 現在行の最大高さ
     this.padding = 3; // 枠間の余白（mm）
+    this.placementCounter = 0; // 配置順カウンター（配置順整列で使用）
   }
 
   // スタンプ枠を作成してキャンバスに追加
@@ -112,6 +113,9 @@ class FrameFactory {
       const pos = this._getNextPosition(width, height);
       group.set({ left: pos.x, top: pos.y });
     }
+
+    // 配置順カウンターを割り当て（配置順整列で使用）
+    group._placementOrder = this.placementCounter++;
 
     // キャンバスに追加
     const canvas = this.cm.getCanvas();
