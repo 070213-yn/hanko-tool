@@ -380,7 +380,8 @@ class Exporter {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    // iPad Safariではダウンロード確認ダイアログ表示中にURLが無効化されるのを防ぐ
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
   // === PSD エクスポート（600DPI、枠+メモ+タイトル統合レイヤー） ===
