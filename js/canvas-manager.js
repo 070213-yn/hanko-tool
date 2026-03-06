@@ -409,27 +409,34 @@ class CanvasManager {
   }
 
   // === 2段階タッチ ===
-  // 1回目タッチ → 選択のみ（移動不可）
+  // 1回目タッチ → 選択のみ（移動不可、長押しドラッグも不可）
   // 2回目タッチ（同じ枠） → 移動可能になる
   _setupTwoStepTouch() {
-    let selectedOnThisDown = false;
+    // Fabric.jsがmouse:downでオブジェクトを選択する前の状態を記録
+    let activeBeforeDown = null;
+
+    this.canvas.on('mouse:down:before', () => {
+      // mouse:down:beforeはFabric.jsの内部選択処理より前に発火する
+      activeBeforeDown = this.canvas.getActiveObject();
+    });
 
     this.canvas.on('mouse:down', (opt) => {
       if (this.isPanning) return;
       if (opt.e.altKey || opt.e.button === 1) return;
       const target = opt.target;
-      selectedOnThisDown = false;
 
       if (target && target.isStampFrame) {
         if (this.activatedFrame === target) {
           // 既にアクティブ → そのまま移動可能
-        } else if (this.canvas.getActiveObject() === target && !this.activatedFrame) {
-          // 既に選択済みの枠を再タッチ → 移動許可
+        } else if (activeBeforeDown === target && !this.activatedFrame) {
+          // mouse:down:beforeの時点で既に選択済み = 2回目タッチ → 移動許可
           this._activateFrame(target);
         } else {
-          // 新規選択: 移動をロックして選択のみ
+          // 新規選択（1回目タッチ）: 移動をロック
           target.set({ lockMovementX: true, lockMovementY: true });
-          selectedOnThisDown = true;
+          // ドラッグ時のリセット用に元の位置を記録
+          target._frozenLeft = target.left;
+          target._frozenTop = target.top;
 
           // 前のアクティブ枠をリセット
           if (this.activatedFrame) {
@@ -446,6 +453,16 @@ class CanvasManager {
           this.activatedFrame.set({ lockMovementX: true, lockMovementY: true });
           this._updateFrameAppearance(this.activatedFrame, false);
           this.activatedFrame = null;
+        }
+      }
+    });
+
+    // 未アクティブの枠が移動しようとしたら強制的に元の位置に戻す（長押しドラッグ対策）
+    this.canvas.on('object:moving', (opt) => {
+      const target = opt.target;
+      if (target && target.isStampFrame && this.activatedFrame !== target) {
+        if (target._frozenLeft !== undefined) {
+          target.set({ left: target._frozenLeft, top: target._frozenTop });
         }
       }
     });
