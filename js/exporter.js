@@ -371,8 +371,25 @@ class Exporter {
     return sections;
   }
 
-  // Blobをファイルとしてダウンロード
-  _downloadBlob(blob, filename) {
+  // iOS: Web Share APIで保存先を選択、デスクトップ: 従来のダウンロード
+  async _shareOrDownload(buffer, filename) {
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+
+    // iOS: Web Share APIで保存先を選択可能にする（共有シートが表示される）
+    if (this._isIOSDevice() && navigator.canShare) {
+      const file = new File([blob], filename, { type: 'application/octet-stream' });
+      if (navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          return;
+        } catch (e) {
+          if (e.name === 'AbortError') return; // ユーザーがキャンセル
+          // Share失敗時はフォールバック
+        }
+      }
+    }
+
+    // デスクトップまたはフォールバック
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.download = filename;
@@ -380,7 +397,6 @@ class Exporter {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    // iPad Safariではダウンロード確認ダイアログ表示中にURLが無効化されるのを防ぐ
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
@@ -401,57 +417,99 @@ class Exporter {
     if (!bounds) return;
 
     const dpi = 600;
-    const scale = dpi / 25.4; // 1mmあたりのピクセル数
+    const scale = dpi / 25.4;
     const outputW = Math.round(bounds.width * scale);
     const outputH = Math.round(bounds.height * scale);
     const maxPixels = this._getMaxCanvasPixels();
-
-    // オフセット（トリミング位置）
     const offsetXPx = bounds.left * scale;
     const offsetYPx = bounds.top * scale;
 
-    this._showLoading(`PSD書出し中... (${outputW}x${outputH}px, ${dpi}DPI)`);
+    if (outputW * outputH <= maxPixels) {
+      // 上限内 → 一括書出し
+      this._showLoading(`PSD書出し中... (${outputW}x${outputH}px, ${dpi}DPI)`);
+      await this._sleep(100);
+      try {
+        const psdBuffer = this._renderPSD600(frames, bounds, scale, 0, outputH, outputW, outputH, offsetXPx, offsetYPx, dpi);
+        await this._shareOrDownload(psdBuffer, this._getFileName('psd'));
+      } catch (e) {
+        console.error('PSDエクスポートエラー:', e);
+        alert('PSDエクスポートに失敗しました。\n' + e.message);
+      } finally {
+        this._hideLoading();
+      }
+    } else {
+      // 上限超え → 分割ボタンを表示
+      const sections = this._buildRowBoundaries(frames, bounds, scale, maxPixels, outputW);
+      this._splitParams = { sections, frames, bounds, scale, outputW, offsetXPx, offsetYPx, dpi };
+      this._showSplitButtons(sections);
+    }
+  }
+
+  // 分割ダウンロードボタンを表示
+  _showSplitButtons(sections) {
+    const containers = [
+      document.getElementById('psd-split-buttons'),
+      document.getElementById('mobile-psd-split-buttons'),
+    ].filter(Boolean);
+
+    const svgIcon = '<svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">'
+      + '<path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"/>'
+      + '<path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/></svg>';
+
+    containers.forEach(container => {
+      container.innerHTML = '';
+      container.style.display = 'block';
+
+      const info = document.createElement('p');
+      info.className = 'text-xs text-gray-500 mb-2';
+      info.textContent = `容量制限のため${sections.length}枚に分割します。1枚ずつダウンロードしてください。`;
+      container.appendChild(info);
+
+      sections.forEach((_, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'action-btn glass-secondary w-full';
+        btn.style.marginBottom = '4px';
+        btn.innerHTML = svgIcon + ` PSD ${i + 1}枚目`;
+        btn.addEventListener('click', () => this._exportPSDSection(i));
+        container.appendChild(btn);
+      });
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'text-xs text-gray-400 mt-1 w-full text-center';
+      closeBtn.textContent = '閉じる';
+      closeBtn.style.cssText = 'cursor:pointer; background:none; border:none; font-family:inherit;';
+      closeBtn.addEventListener('click', () => this._hideSplitButtons());
+      container.appendChild(closeBtn);
+    });
+  }
+
+  // 分割ボタンを非表示
+  _hideSplitButtons() {
+    ['psd-split-buttons', 'mobile-psd-split-buttons'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+    });
+    this._splitParams = null;
+  }
+
+  // 分割PSDの1セクションをダウンロード
+  async _exportPSDSection(index) {
+    if (!this._splitParams) return;
+    const { sections, frames, bounds, scale, outputW, offsetXPx, offsetYPx, dpi } = this._splitParams;
+    const { startYPx, endYPx } = sections[index];
+    const partH = endYPx - startYPx;
+    const baseName = this._getFileName('psd').replace('.psd', '');
+    const filename = `${baseName}_${String(index + 1).padStart(3, '0')}.psd`;
+
+    this._showLoading(`PSD ${index + 1}枚目を生成中...`);
     await this._sleep(100);
 
     try {
-      if (outputW * outputH <= maxPixels) {
-        // 上限内 → 従来通り一括書出し
-        const psdBuffer = this._renderPSD600(frames, bounds, scale, 0, outputH, outputW, outputH, offsetXPx, offsetYPx, dpi);
-        this._downloadBuffer(psdBuffer, this._getFileName('psd'));
-      } else {
-        // 上限超え → 行境界ベースで分割し、ZIPにまとめてダウンロード
-        const sections = this._buildRowBoundaries(frames, bounds, scale, maxPixels, outputW);
-        const baseName = this._getFileName('psd').replace('.psd', '');
-
-        this._showLoading(`PSD分割書出し中... (${sections.length}ファイル, ${dpi}DPI)`);
-
-        const zip = new JSZip();
-
-        for (let i = 0; i < sections.length; i++) {
-          const { startYPx, endYPx } = sections[i];
-          const partH = endYPx - startYPx;
-
-          this._showLoading(`PSD分割書出し中... (${i + 1}/${sections.length})`);
-          await this._sleep(50);
-
-          try {
-            const psdBuffer = this._renderPSD600(frames, bounds, scale, startYPx, endYPx, outputW, partH, offsetXPx, offsetYPx, dpi);
-            const filename = `${baseName}_${String(i + 1).padStart(3, '0')}.psd`;
-            zip.file(filename, psdBuffer);
-          } catch (e) {
-            console.error(`分割${i + 1}/${sections.length}の書き出しに失敗:`, e);
-            alert(`分割${i + 1}/${sections.length}の書き出しに失敗しました。`);
-          }
-        }
-
-        this._showLoading('ZIPファイル生成中...');
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        const zipFilename = `${baseName}.zip`;
-        this._downloadBlob(zipBlob, zipFilename);
-      }
+      const psdBuffer = this._renderPSD600(frames, bounds, scale, startYPx, endYPx, outputW, partH, offsetXPx, offsetYPx, dpi);
+      await this._shareOrDownload(psdBuffer, filename);
     } catch (e) {
-      console.error('PSDエクスポートエラー:', e);
-      alert('PSDエクスポートに失敗しました。\n' + e.message);
+      console.error(`PSD ${index + 1}枚目の書き出しに失敗:`, e);
+      alert(`PSD ${index + 1}枚目の書き出しに失敗しました。`);
     } finally {
       this._hideLoading();
     }
@@ -575,10 +633,23 @@ class Exporter {
       }
     });
 
+    // 統合画像を生成（Procreate等との互換性のため）
+    // PSDの「統合画像」はレイヤーを全て結合した見た目で、これがないと一部アプリで開けない
+    const mergedCanvas = document.createElement('canvas');
+    mergedCanvas.width = widthPx;
+    mergedCanvas.height = heightPx;
+    const mergedCtx = mergedCanvas.getContext('2d');
+    mergedCtx.drawImage(bgCanvas, 0, 0);
+    imageChildren.forEach(child => {
+      mergedCtx.drawImage(child.canvas, child.left, child.top);
+    });
+    mergedCtx.drawImage(frameInfoCanvas, 0, 0);
+
     // PSDデータ構築
     const psd = {
       width: widthPx,
       height: heightPx,
+      canvas: mergedCanvas,
       imageResources: {
         resolutionInfo: {
           horizontalResolution: dpi,
