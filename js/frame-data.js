@@ -83,8 +83,11 @@ const FRAME_DATA = {
 
   // エクスポート設定
   EXPORT_DPI: 1200,
+  EXPORT_DPI_PSD: 600,
   get EXPORT_WIDTH_PX() { return Math.round(this.A4_WIDTH / 25.4 * this.EXPORT_DPI); },
   get EXPORT_HEIGHT_PX() { return Math.round(this.A4_HEIGHT / 25.4 * this.EXPORT_DPI); },
+  get PSD_WIDTH_PX() { return Math.round(this.A4_WIDTH / 25.4 * this.EXPORT_DPI_PSD); },
+  get PSD_HEIGHT_PX() { return Math.round(this.A4_HEIGHT / 25.4 * this.EXPORT_DPI_PSD); },
 
   // Googleスプレッドシート連携用
   sheetId: '1K6aqI79ZdEvCp0CMpi9eUzlxUl3ub5eWGThDadRaQj0',

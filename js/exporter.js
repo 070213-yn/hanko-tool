@@ -1,5 +1,5 @@
-// 1200DPI PNGエクスポート・PSDエクスポート（コンテンツ領域トリミング対応）
-// iPad DPI制限対策: iOS上限超え時はPNG分割ダウンロード、PSD分割レイヤー
+// PNGエクスポート（1200DPI）・PSDエクスポート（600DPI）（コンテンツ領域トリミング対応）
+// iPad DPI制限対策: iOS上限超え時はPNG分割ダウンロード、PSD複数ファイル分割
 
 class Exporter {
   constructor(canvasManager) {
@@ -285,6 +285,19 @@ class Exporter {
     document.body.removeChild(link);
   }
 
+  // ArrayBufferをファイルとしてダウンロード
+  _downloadBuffer(buffer, filename) {
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = url;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   _showLoading(text) {
     const overlay = document.getElementById('loading-overlay');
     const label = document.getElementById('loading-text');
@@ -301,7 +314,7 @@ class Exporter {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // === PSD エクスポート（1200DPI固定、iOS上限超え時はレイヤー分割） ===
+  // === PSD エクスポート（600DPI、枠+メモ+タイトル統合レイヤー） ===
   async exportPSD() {
     if (typeof agPsd === 'undefined') {
       alert('PSDライブラリの読み込みに失敗しました。ページを再読み込みしてください。');
@@ -317,184 +330,211 @@ class Exporter {
     const bounds = this._getContentBounds();
     if (!bounds) return;
 
-    const multiplier = this._getFullMultiplier(); // 常に1200DPI
-    const outputW = Math.round(bounds.width * multiplier);
-    const outputH = Math.round(bounds.height * multiplier);
-    const actualDPI = Math.round(multiplier * 25.4);
+    const dpi = 600;
+    const scale = dpi / 25.4; // 1mmあたりのピクセル数
+    const outputW = Math.round(bounds.width * scale);
+    const outputH = Math.round(bounds.height * scale);
     const maxPixels = this._getMaxCanvasPixels();
 
-    // トリミングオフセット（ピクセル単位）
-    const offsetX = bounds.left * multiplier;
-    const offsetY = bounds.top * multiplier;
+    // オフセット（トリミング位置）
+    const offsetXPx = bounds.left * scale;
+    const offsetYPx = bounds.top * scale;
 
-    // 大きなキャンバスかどうか判定
-    const isLargeCanvas = (outputW * outputH) > maxPixels;
+    // 分割数を計算
+    let splitCount = 1;
+    if (outputW * outputH > maxPixels) {
+      splitCount = Math.ceil(outputW * outputH / maxPixels) + 1;
+    }
 
-    this._showLoading(`PSD書出し中... (${outputW}x${outputH}px, ${actualDPI}DPI)`);
+    this._showLoading(`PSD書出し中... (${outputW}x${outputH}px, ${dpi}DPI)`);
     await this._sleep(100);
 
     try {
-      const psdLayers = [];
-      const canvas = this.cm.getCanvas();
-
-      // === 背景レイヤー ===
-      if (isLargeCanvas) {
-        // iOS上限超え: 背景をストリップ分割
-        const bgStripH = Math.floor(maxPixels / outputW);
-        let stripIdx = 1;
-        for (let y = 0; y < outputH; y += bgStripH) {
-          const h = Math.min(bgStripH, outputH - y);
-          const bgCanvas = document.createElement('canvas');
-          bgCanvas.width = outputW;
-          bgCanvas.height = h;
-          const bgCtx = bgCanvas.getContext('2d');
-          bgCtx.fillStyle = '#FFFFFF';
-          bgCtx.fillRect(0, 0, outputW, h);
-          psdLayers.push({
-            name: `背景_${stripIdx}`,
-            canvas: bgCanvas,
-            left: 0,
-            top: y,
-          });
-          stripIdx++;
-        }
+      if (splitCount === 1) {
+        // 一括書出し
+        const psdBuffer = this._renderPSD600(frames, bounds, scale, 0, outputH, outputW, outputH, offsetXPx, offsetYPx, dpi);
+        this._downloadBuffer(psdBuffer, this._getFileName('psd'));
       } else {
-        // 上限内: 一括背景
-        const bgCanvas = document.createElement('canvas');
-        bgCanvas.width = outputW;
-        bgCanvas.height = outputH;
-        const bgCtx = bgCanvas.getContext('2d');
-        bgCtx.fillStyle = '#FFFFFF';
-        bgCtx.fillRect(0, 0, outputW, outputH);
-        psdLayers.push({
-          name: '背景',
-          canvas: bgCanvas,
-          left: 0,
-          top: 0,
-        });
-      }
+        // 分割書出し
+        const sectionH = Math.ceil(outputH / splitCount);
+        const baseName = this._getFileName('psd').replace('.psd', '');
+        for (let i = 0; i < splitCount; i++) {
+          const startY = i * sectionH;
+          const endY = Math.min(startY + sectionH, outputH);
+          const partH = endY - startY;
 
-      // === タイトルレイヤー ===
-      const titleObj = canvas.getObjects().find(o => o.isTitleText);
-      if (titleObj && titleObj.text) {
-        const fontSize = Math.round(5 * multiplier);
-        const tc = document.createElement('canvas');
-        const tctx = tc.getContext('2d');
-        tctx.font = `bold ${fontSize}px "Noto Sans JP", sans-serif`;
-        const measured = tctx.measureText(titleObj.text);
-        tc.width = Math.ceil(measured.width) + 4;
-        tc.height = Math.ceil(fontSize * 1.3);
-        // canvasリサイズでfontがリセットされるので再設定
-        tctx.font = `bold ${fontSize}px "Noto Sans JP", sans-serif`;
-        tctx.fillStyle = '#000000';
-        tctx.textBaseline = 'top';
-        tctx.fillText(titleObj.text, 0, 0);
+          this._showLoading(`PSD書出し中... (${i + 1}/${splitCount})`);
 
-        psdLayers.push({
-          name: 'タイトル',
-          canvas: tc,
-          left: Math.round(titleObj.left * multiplier - offsetX),
-          top: Math.round(titleObj.top * multiplier - offsetY),
-        });
-      }
-
-      // === 配置画像を個別レイヤーとして追加 ===
-      frames.forEach(frame => {
-        if (window.imagePlacer) {
-          const uid = window.imagePlacer._getFrameUid(frame);
-          const placement = window.imagePlacer.placements[uid];
-          if (placement && placement.fabricImg) {
-            const imgResult = this._renderPlacedImage(placement.fabricImg, frame, multiplier);
-            if (imgResult) {
-              psdLayers.push({
-                name: '画像 - ' + frame.stampId,
-                canvas: imgResult.canvas,
-                left: imgResult.left - Math.round(offsetX),
-                top: imgResult.top - Math.round(offsetY),
-              });
-            }
+          try {
+            const psdBuffer = this._renderPSD600(frames, bounds, scale, startY, endY, outputW, partH, offsetXPx, offsetYPx, dpi);
+            const filename = `${baseName}_${String(i + 1).padStart(3, '0')}.psd`;
+            this._downloadBuffer(psdBuffer, filename);
+          } catch (e) {
+            console.error(`分割${i + 1}/${splitCount}の書き出しに失敗:`, e);
+            alert(`分割${i + 1}/${splitCount}の書き出しに失敗しました。`);
           }
-        }
-      });
 
-      // === 枠線レイヤー ===
-      if (isLargeCanvas) {
-        // iOS上限超え: 枠線を個別レイヤーに分割
-        frames.forEach(frame => {
-          const result = this._renderFrameLines(frame, multiplier);
-          psdLayers.push({
-            name: '枠線 - ' + frame.stampId,
-            canvas: result.canvas,
-            left: result.left - Math.round(offsetX),
-            top: result.top - Math.round(offsetY),
-          });
-        });
-      } else {
-        // 上限内: 全枠線を1枚のレイヤーにまとめて描画
-        const allFramesResult = this._renderAllFrameLines(frames, multiplier);
-        psdLayers.push({
-          name: '枠線（全体）',
-          canvas: allFramesResult.canvas,
-          left: allFramesResult.left - Math.round(offsetX),
-          top: allFramesResult.top - Math.round(offsetY),
-        });
-      }
-
-      // === サイズ表記・メモレイヤー ===
-      if (isLargeCanvas) {
-        // iOS上限超え: 枠ごとに個別レイヤー
-        frames.forEach(frame => {
-          const labelResult = this._renderLabelSingle(frame, multiplier);
-          if (labelResult) {
-            psdLayers.push({
-              name: 'ラベル - ' + frame.stampId,
-              canvas: labelResult.canvas,
-              left: labelResult.left - Math.round(offsetX),
-              top: labelResult.top - Math.round(offsetY),
-            });
-          }
-        });
-      } else {
-        // 上限内: まとめて描画
-        const labelsResult = this._renderLabels(frames, multiplier);
-        if (labelsResult) {
-          psdLayers.push({
-            name: 'サイズ表記・メモ',
-            canvas: labelsResult.canvas,
-            left: labelsResult.left - Math.round(offsetX),
-            top: labelsResult.top - Math.round(offsetY),
-          });
+          await this._sleep(500);
         }
       }
-
-      const psd = {
-        width: outputW,
-        height: outputH,
-        imageResources: {
-          resolutionInfo: {
-            horizontalResolution: actualDPI,
-            horizontalResolutionUnit: 'PPI',
-            widthUnit: 'Inches',
-            verticalResolution: actualDPI,
-            verticalResolutionUnit: 'PPI',
-            heightUnit: 'Inches',
-          },
-        },
-        children: psdLayers,
-      };
-
-      const result = agPsd.writePsd(psd);
-      const blob = new Blob([result], { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      this._downloadURL(url, this._getFileName('psd'));
-      URL.revokeObjectURL(url);
-
     } catch (e) {
       console.error('PSDエクスポートエラー:', e);
       alert('PSDエクスポートに失敗しました。\n' + e.message);
     } finally {
       this._hideLoading();
     }
+  }
+
+  // 600DPI PSD データを生成（枠+メモ+タイトル統合レイヤー）
+  _renderPSD600(frames, bounds, scale, startYPx, endYPx, widthPx, heightPx, offsetXPx, offsetYPx, dpi) {
+    const canvas = this.cm.getCanvas();
+
+    // 背景レイヤー（白）
+    const bgCanvas = document.createElement('canvas');
+    bgCanvas.width = widthPx;
+    bgCanvas.height = heightPx;
+    const bgCtx = bgCanvas.getContext('2d');
+    bgCtx.fillStyle = '#FFFFFF';
+    bgCtx.fillRect(0, 0, widthPx, heightPx);
+
+    // 枠情報レイヤー（枠線 + サイズ表記 + メモ + タイトル）
+    const frameInfoCanvas = document.createElement('canvas');
+    frameInfoCanvas.width = widthPx;
+    frameInfoCanvas.height = heightPx;
+    const fiCtx = frameInfoCanvas.getContext('2d');
+
+    // タイトル描画
+    const titleObj = canvas.getObjects().find(o => o.isTitleText);
+    if (titleObj && titleObj.text) {
+      const fontSize = Math.round(5 * scale);
+      fiCtx.font = `bold ${fontSize}px "Noto Sans JP", sans-serif`;
+      fiCtx.fillStyle = '#000000';
+      fiCtx.textBaseline = 'top';
+      const titleX = titleObj.left * scale - offsetXPx;
+      const titleY = titleObj.top * scale - offsetYPx - startYPx;
+      if (titleY + fontSize > 0 && titleY < heightPx) {
+        fiCtx.fillText(titleObj.text, titleX, titleY);
+      }
+    }
+
+    // 配置画像レイヤー
+    const imageChildren = [];
+
+    frames.forEach(frame => {
+      const category = frame._category;
+      const margin = category.margin;
+      const fx = frame.left * scale - offsetXPx;
+      const fy = frame.top * scale - offsetYPx - startYPx;
+      const fw = frame.stampWidth * scale;
+      const fh = frame.stampHeight * scale;
+
+      // この分割範囲に含まれるかチェック
+      if (fy + fh + 10 * scale < 0 || fy > heightPx) return;
+
+      // 外枠
+      fiCtx.strokeStyle = category.outerStroke;
+      fiCtx.lineWidth = Math.max(1, 0.4 * scale);
+      fiCtx.setLineDash(category.outerStrokeDash.length > 0
+        ? category.outerStrokeDash.map(v => v * scale) : []);
+      fiCtx.strokeRect(fx, fy, fw, fh);
+
+      // 内枠
+      const innerX = fx + margin * scale;
+      const innerY = fy + margin * scale;
+      const innerW = (frame.stampWidth - margin * 2) * scale;
+      const innerH = (frame.stampHeight - margin * 2) * scale;
+      fiCtx.strokeStyle = category.innerStroke;
+      fiCtx.lineWidth = Math.max(1, 0.3 * scale);
+      fiCtx.setLineDash(category.innerStrokeDash.length > 0
+        ? category.innerStrokeDash.map(v => v * scale) : []);
+      fiCtx.strokeRect(innerX, innerY, innerW, innerH);
+      fiCtx.setLineDash([]);
+
+      // サイズ表記（右下外側、右揃え）
+      const sizeText = `${frame.stampId} ${frame.stampWidth}\u00D7${frame.stampHeight}`;
+      const sizeFontSize = Math.round(2.5 * scale);
+      fiCtx.font = `500 ${sizeFontSize}px sans-serif`;
+      fiCtx.fillStyle = category.labelColor;
+      fiCtx.globalAlpha = 0.55;
+      fiCtx.textAlign = 'right';
+      fiCtx.textBaseline = 'top';
+      fiCtx.fillText(sizeText, fx + fw, fy + fh + 0.3 * scale);
+
+      // メモ（サイズ表記の下、黒色、折り返し対応）
+      const memo = frame.stampMemo || '';
+      if (memo) {
+        const memoFontSize = Math.round(2.2 * scale);
+        fiCtx.font = `400 ${memoFontSize}px sans-serif`;
+        fiCtx.fillStyle = '#000000';
+        fiCtx.globalAlpha = 1.0;
+        fiCtx.textAlign = 'left';
+        fiCtx.textBaseline = 'top';
+        const memoX = fx;
+        const memoY = fy + fh + 3 * scale;
+        const memoMaxW = Math.max(fw, 20 * scale);
+        this._wrapText(fiCtx, memo, memoX, memoY, memoMaxW, memoFontSize * 1.3);
+      }
+
+      fiCtx.globalAlpha = 1.0;
+      fiCtx.textAlign = 'start';
+      fiCtx.textBaseline = 'alphabetic';
+
+      // 配置済み画像を個別レイヤーとして追加
+      if (window.imagePlacer) {
+        const uid = window.imagePlacer._getFrameUid(frame);
+        const placement = window.imagePlacer.placements[uid];
+        if (placement && placement.fabricImg) {
+          const imgResult = this._renderPlacedImage(placement.fabricImg, frame, scale);
+          if (imgResult) {
+            const imgLeft = imgResult.left - Math.round(offsetXPx);
+            const imgTop = imgResult.top - Math.round(offsetYPx) - startYPx;
+
+            // この分割範囲に含まれるかチェック
+            if (imgTop + imgResult.canvas.height >= 0 && imgTop < heightPx) {
+              imageChildren.push({
+                name: '画像 - ' + frame.stampId,
+                canvas: imgResult.canvas,
+                left: imgLeft,
+                top: imgTop,
+              });
+            }
+          }
+        }
+      }
+    });
+
+    // PSDデータ構築
+    const psd = {
+      width: widthPx,
+      height: heightPx,
+      imageResources: {
+        resolutionInfo: {
+          horizontalResolution: dpi,
+          horizontalResolutionUnit: 'PPI',
+          widthUnit: 'Inches',
+          verticalResolution: dpi,
+          verticalResolutionUnit: 'PPI',
+          heightUnit: 'Inches',
+        },
+      },
+      children: [
+        {
+          name: '背景',
+          canvas: bgCanvas,
+          left: 0,
+          top: 0,
+        },
+        {
+          name: '枠情報・メモ・タイトル',
+          canvas: frameInfoCanvas,
+          left: 0,
+          top: 0,
+        },
+        ...imageChildren,
+      ],
+    };
+
+    return agPsd.writePsd(psd);
   }
 
   // 配置済み画像をオフスクリーンCanvasにレンダリング

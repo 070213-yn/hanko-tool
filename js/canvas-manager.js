@@ -14,9 +14,10 @@ class CanvasManager {
     this.gridSpacing = 5; // 5mmグリッド表示
     this.snapGrid = 1;    // 1mmスナップ（デフォルト）
     this.snapToGridEnabled = false; // グリッドスナップ（5mm）のON/OFF
+    this.activatedFrame = null; // 2段階タッチで移動可能になった枠
 
     // Fabric.jsがキャンバスをラップする前にコンテナを記録
-    this.containerEl = this.canvasEl.parentElement;
+    this.containerEl = document.getElementById('canvas-container') || this.canvasEl.parentElement;
 
     this._init();
   }
@@ -39,6 +40,7 @@ class CanvasManager {
     this._setupPan();
     this._setupResize();
     this._setupTouch();
+    this._setupTwoStepTouch();
   }
 
   // コンテナに合わせてキャンバスサイズを設定
@@ -404,6 +406,93 @@ class CanvasManager {
 
   getCanvas() {
     return this.canvas;
+  }
+
+  // === 2段階タッチ ===
+  // 1回目タッチ → 選択のみ（移動不可）
+  // 2回目タッチ（同じ枠） → 移動可能になる
+  _setupTwoStepTouch() {
+    let selectedOnThisDown = false;
+
+    this.canvas.on('mouse:down', (opt) => {
+      if (this.isPanning) return;
+      if (opt.e.altKey || opt.e.button === 1) return;
+      const target = opt.target;
+      selectedOnThisDown = false;
+
+      if (target && target.isStampFrame) {
+        if (this.activatedFrame === target) {
+          // 既にアクティブ → そのまま移動可能
+        } else if (this.canvas.getActiveObject() === target && !this.activatedFrame) {
+          // 既に選択済みの枠を再タッチ → 移動許可
+          this._activateFrame(target);
+        } else {
+          // 新規選択: 移動をロックして選択のみ
+          target.set({ lockMovementX: true, lockMovementY: true });
+          selectedOnThisDown = true;
+
+          // 前のアクティブ枠をリセット
+          if (this.activatedFrame) {
+            this.activatedFrame.set({ lockMovementX: true, lockMovementY: true });
+            this._updateFrameAppearance(this.activatedFrame, false);
+            this.activatedFrame = null;
+          }
+
+          this.canvas.requestRenderAll();
+        }
+      } else {
+        // 空白クリック: アクティブ枠リセット
+        if (this.activatedFrame) {
+          this.activatedFrame.set({ lockMovementX: true, lockMovementY: true });
+          this._updateFrameAppearance(this.activatedFrame, false);
+          this.activatedFrame = null;
+        }
+      }
+    });
+
+    // 選択解除時にリセット
+    this.canvas.on('selection:cleared', () => {
+      if (this.activatedFrame) {
+        this.activatedFrame.set({ lockMovementX: true, lockMovementY: true });
+        this._updateFrameAppearance(this.activatedFrame, false);
+        this.activatedFrame = null;
+      }
+    });
+
+    // 別のオブジェクトに選択が変わった時
+    this.canvas.on('selection:updated', () => {
+      if (this.activatedFrame) {
+        this.activatedFrame.set({ lockMovementX: true, lockMovementY: true });
+        this._updateFrameAppearance(this.activatedFrame, false);
+        this.activatedFrame = null;
+      }
+    });
+  }
+
+  // 枠を「移動可能」状態にする
+  _activateFrame(frame) {
+    frame.set({ lockMovementX: false, lockMovementY: false });
+    this.activatedFrame = frame;
+    this._updateFrameAppearance(frame, true);
+    this.canvas.requestRenderAll();
+
+    // 移動可能になったことを通知
+    document.dispatchEvent(new CustomEvent('frame-activated', { detail: { frame } }));
+  }
+
+  // 枠の外見を移動可能/不可で切り替え
+  _updateFrameAppearance(frame, activated) {
+    if (activated) {
+      frame.set({
+        borderColor: '#10b981',     // 緑 = 移動OK
+        borderScaleFactor: 2,
+      });
+    } else {
+      frame.set({
+        borderColor: '#2563eb',     // 青 = 選択のみ
+        borderScaleFactor: 1.5,
+      });
+    }
   }
 
   destroy() {
