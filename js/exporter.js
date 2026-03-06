@@ -314,6 +314,75 @@ class Exporter {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  // 行境界ベースの分割セクションを計算
+  // 枠が途中で切れないように「行の境界」で分割点を決定する
+  _buildRowBoundaries(frames, bounds, scale, maxPixels, outputW) {
+    // フレームをtop順にソート
+    const sorted = [...frames].sort((a, b) => a.top - b.top);
+
+    // 行（垂直方向に重なるフレーム群）をグループ化
+    const rows = []; // 各行: { topMm, bottomMm }
+    sorted.forEach(f => {
+      const fTop = f.top;
+      const fBottom = f.top + f.stampHeight + 8; // +8mm: サイズ表記+メモ分
+
+      if (rows.length === 0) {
+        rows.push({ topMm: fTop, bottomMm: fBottom });
+      } else {
+        const lastRow = rows[rows.length - 1];
+        // 次フレームのtopが現在の行の下端より小さければ同一行
+        if (fTop < lastRow.bottomMm) {
+          // 行の下端を更新（より大きい方を採用）
+          lastRow.bottomMm = Math.max(lastRow.bottomMm, fBottom);
+        } else {
+          rows.push({ topMm: fTop, bottomMm: fBottom });
+        }
+      }
+    });
+
+    // 行をピクセル座標に変換（bounds.topからの相対）
+    const rowsPx = rows.map(r => ({
+      topPx: Math.round((r.topMm - bounds.top) * scale),
+      bottomPx: Math.round((r.bottomMm - bounds.top) * scale),
+    }));
+
+    // 貪欲法: 行を上から順にセクションに詰める
+    const sections = [];
+    let sectionStartPx = 0;
+    let sectionEndPx = 0;
+
+    for (let i = 0; i < rowsPx.length; i++) {
+      const rowBottom = rowsPx[i].bottomPx;
+      const sectionH = rowBottom - sectionStartPx;
+
+      if (outputW * sectionH > maxPixels && sectionEndPx > sectionStartPx) {
+        // この行を入れるとピクセル上限を超える → 手前で切る
+        sections.push({ startYPx: sectionStartPx, endYPx: sectionEndPx });
+        sectionStartPx = sectionEndPx;
+      }
+
+      sectionEndPx = rowBottom;
+    }
+
+    // 最後のセクション
+    const outputH = Math.round(bounds.height * scale);
+    sections.push({ startYPx: sectionStartPx, endYPx: Math.max(sectionEndPx, outputH) });
+
+    return sections;
+  }
+
+  // Blobをファイルとしてダウンロード
+  _downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = url;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   // === PSD エクスポート（600DPI、枠+メモ+タイトル統合レイヤー） ===
   async exportPSD() {
     if (typeof agPsd === 'undefined') {
@@ -340,42 +409,44 @@ class Exporter {
     const offsetXPx = bounds.left * scale;
     const offsetYPx = bounds.top * scale;
 
-    // 分割数を計算
-    let splitCount = 1;
-    if (outputW * outputH > maxPixels) {
-      splitCount = Math.ceil(outputW * outputH / maxPixels) + 1;
-    }
-
     this._showLoading(`PSD書出し中... (${outputW}x${outputH}px, ${dpi}DPI)`);
     await this._sleep(100);
 
     try {
-      if (splitCount === 1) {
-        // 一括書出し
+      if (outputW * outputH <= maxPixels) {
+        // 上限内 → 従来通り一括書出し
         const psdBuffer = this._renderPSD600(frames, bounds, scale, 0, outputH, outputW, outputH, offsetXPx, offsetYPx, dpi);
         this._downloadBuffer(psdBuffer, this._getFileName('psd'));
       } else {
-        // 分割書出し
-        const sectionH = Math.ceil(outputH / splitCount);
+        // 上限超え → 行境界ベースで分割し、ZIPにまとめてダウンロード
+        const sections = this._buildRowBoundaries(frames, bounds, scale, maxPixels, outputW);
         const baseName = this._getFileName('psd').replace('.psd', '');
-        for (let i = 0; i < splitCount; i++) {
-          const startY = i * sectionH;
-          const endY = Math.min(startY + sectionH, outputH);
-          const partH = endY - startY;
 
-          this._showLoading(`PSD書出し中... (${i + 1}/${splitCount})`);
+        this._showLoading(`PSD分割書出し中... (${sections.length}ファイル, ${dpi}DPI)`);
+
+        const zip = new JSZip();
+
+        for (let i = 0; i < sections.length; i++) {
+          const { startYPx, endYPx } = sections[i];
+          const partH = endYPx - startYPx;
+
+          this._showLoading(`PSD分割書出し中... (${i + 1}/${sections.length})`);
+          await this._sleep(50);
 
           try {
-            const psdBuffer = this._renderPSD600(frames, bounds, scale, startY, endY, outputW, partH, offsetXPx, offsetYPx, dpi);
+            const psdBuffer = this._renderPSD600(frames, bounds, scale, startYPx, endYPx, outputW, partH, offsetXPx, offsetYPx, dpi);
             const filename = `${baseName}_${String(i + 1).padStart(3, '0')}.psd`;
-            this._downloadBuffer(psdBuffer, filename);
+            zip.file(filename, psdBuffer);
           } catch (e) {
-            console.error(`分割${i + 1}/${splitCount}の書き出しに失敗:`, e);
-            alert(`分割${i + 1}/${splitCount}の書き出しに失敗しました。`);
+            console.error(`分割${i + 1}/${sections.length}の書き出しに失敗:`, e);
+            alert(`分割${i + 1}/${sections.length}の書き出しに失敗しました。`);
           }
-
-          await this._sleep(500);
         }
+
+        this._showLoading('ZIPファイル生成中...');
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const zipFilename = `${baseName}.zip`;
+        this._downloadBlob(zipBlob, zipFilename);
       }
     } catch (e) {
       console.error('PSDエクスポートエラー:', e);
