@@ -26,9 +26,9 @@ html, body {
   overflow: hidden;
 }
 
-/* サイドバー - 幅を広めに（メモ入力が使いやすいように） */
+/* サイドバー */
 #sidebar {
-  width: 300px;
+  width: 260px;
   flex-shrink: 0;
   overflow-y: auto;
   border-right: 1px solid #e5e7eb;

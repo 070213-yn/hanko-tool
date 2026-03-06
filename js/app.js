@@ -13,7 +13,12 @@
 
   // 初期化
   document.addEventListener('DOMContentLoaded', () => {
-    canvasManager = new CanvasManager('main-canvas');
+    try {
+      canvasManager = new CanvasManager('main-canvas');
+    } catch (e) {
+      console.error('キャンバス初期化エラー:', e);
+      return;
+    }
     frameFactory = new FrameFactory(canvasManager);
     snapAlign = new SnapAlign(canvasManager);
     psdHandler = new PsdHandler(canvasManager);

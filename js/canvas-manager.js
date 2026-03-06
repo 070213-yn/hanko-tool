@@ -17,8 +17,9 @@ class CanvasManager {
     // 2段階タッチ: 1回目→選択、2回目→移動可能
     this.activatedFrame = null; // 移動が許可された（2回タッチされた）枠
 
-    // Fabric.jsがキャンバスをラップする前にコンテナを記録
-    this.containerEl = this.canvasEl.parentElement;
+    // canvas-containerを基準にサイズ計算
+    this.containerEl = document.getElementById('canvas-container')
+                      || this.canvasEl.parentElement;
 
     this._init();
   }
@@ -129,46 +130,42 @@ class CanvasManager {
   // 1回目タッチ → 選択のみ（移動不可）
   // 2回目タッチ（同じ枠） → 移動可能になる
   _setupTwoStepTouch() {
+    // _selectedOnThisDown: このmouse:downで新しく選択された枠
+    // （同じdown/upサイクルで即activateしないためのガード）
+    let selectedOnThisDown = false;
+
     this.canvas.on('mouse:down', (opt) => {
       if (this.isPanning) return;
+      if (opt.e.altKey || opt.e.button === 1) return; // パン操作は無視
       const target = opt.target;
+      selectedOnThisDown = false;
 
       if (target && target.isStampFrame) {
         if (this.activatedFrame === target) {
-          // 2回目: すでにアクティブ → 移動許可（何もしない、ロック解除済み）
+          // 既にアクティブ → そのまま移動可能
+        } else if (this.canvas.getActiveObject() === target && !this.activatedFrame) {
+          // 既に選択済みの枠を再タッチ → 移動許可
+          this._activateFrame(target);
         } else {
-          // 1回目: 選択だけして移動をロック
+          // 新規選択: 移動をロックして選択のみ
           target.set({ lockMovementX: true, lockMovementY: true });
-          this.canvas.setActiveObject(target);
+          selectedOnThisDown = true;
 
-          // 前のアクティブ枠のロックを戻す
+          // 前のアクティブ枠をリセット
           if (this.activatedFrame) {
             this.activatedFrame.set({ lockMovementX: true, lockMovementY: true });
             this._updateFrameAppearance(this.activatedFrame, false);
+            this.activatedFrame = null;
           }
 
-          this.activatedFrame = null;
           this.canvas.requestRenderAll();
         }
-      }
-    });
-
-    // ダブルクリック / 2回目タッチで移動を有効化
-    this.canvas.on('mouse:dblclick', (opt) => {
-      const target = opt.target;
-      if (target && target.isStampFrame) {
-        this._activateFrame(target);
-      }
-    });
-
-    // 選択済み枠をもう一度タップ → 移動有効化
-    this.canvas.on('mouse:up', (opt) => {
-      const target = opt.target;
-      if (target && target.isStampFrame && !this.activatedFrame) {
-        const active = this.canvas.getActiveObject();
-        if (active === target) {
-          // 既に選択されている枠をタップ → 次回から移動可能に
-          this._activateFrame(target);
+      } else {
+        // 空白クリック: アクティブ枠リセット
+        if (this.activatedFrame) {
+          this.activatedFrame.set({ lockMovementX: true, lockMovementY: true });
+          this._updateFrameAppearance(this.activatedFrame, false);
+          this.activatedFrame = null;
         }
       }
     });
@@ -183,7 +180,7 @@ class CanvasManager {
     });
 
     // 別のオブジェクトに選択が変わった時
-    this.canvas.on('selection:updated', (opt) => {
+    this.canvas.on('selection:updated', () => {
       if (this.activatedFrame) {
         this.activatedFrame.set({ lockMovementX: true, lockMovementY: true });
         this._updateFrameAppearance(this.activatedFrame, false);

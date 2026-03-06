@@ -11,8 +11,10 @@
   <!-- Fabric.js v5 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 
-  <!-- ag-psd（PSD読み書き） -->
+  <!-- ag-psd（PSD読み書き）- CommonJSモジュールをブラウザ用にシム -->
+  <script>var exports = {}; var module = { exports: exports };</script>
   <script src="https://cdn.jsdelivr.net/npm/ag-psd@latest/dist/browser.min.js"></script>
+  <script>var agPsd = module.exports || exports; if (!agPsd.readPsd) agPsd = exports;</script>
 
   <!-- カスタムCSS -->
   <link rel="stylesheet" href="css/style.css">
@@ -55,7 +57,7 @@
         <!-- PSD画像読み込み -->
         <div class="mb-4">
           <div class="section-title">PSD画像読み込み</div>
-          <input type="file" id="psd-file-input" accept=".psd" class="hidden">
+          <input type="file" id="psd-file-input" accept=".psd,image/vnd.adobe.photoshop,application/x-photoshop,application/photoshop,application/octet-stream" class="hidden">
           <button id="btn-import-psd" class="action-btn w-full mb-2">
             PSDファイルを選択...
           </button>

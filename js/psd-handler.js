@@ -8,8 +8,18 @@ class PsdHandler {
 
   // === PSD読み込み ===
 
+  // ag-psdが使えるかチェック
+  _checkAgPsd() {
+    if (typeof agPsd === 'undefined' || !agPsd.readPsd) {
+      alert('PSDライブラリの読み込みに失敗しました。\nページを再読み込みしてください。');
+      return false;
+    }
+    return true;
+  }
+
   // PSDファイルを読み込んでレイヤーを抽出・トリミング
   async importPSD(file) {
+    if (!this._checkAgPsd()) return [];
     const buffer = await file.arrayBuffer();
     const psd = agPsd.readPsd(buffer, { skipThumbnail: true });
     this.importedLayers = [];
@@ -121,6 +131,7 @@ class PsdHandler {
 
   // PSDを600DPIで書き出し。サイズ超過時は分割
   async exportPSD(frameFactory, title) {
+    if (!this._checkAgPsd()) return;
     const dpi = FRAME_DATA.EXPORT_DPI_PSD;
     const fullW = FRAME_DATA.PSD_WIDTH_PX;
     const fullH = FRAME_DATA.PSD_HEIGHT_PX;
@@ -330,7 +341,7 @@ class PsdHandler {
     const d = String(now.getDate()).padStart(2, '0');
     let name = `Hankodori_入稿データ_${y}_${m}_${d}`;
     if (totalParts > 1) {
-      name += `_${partNum}データ目_${totalParts}データ中`;
+      name += `_${String(partNum).padStart(3, '0')}`;
     }
     return name + '.psd';
   }
