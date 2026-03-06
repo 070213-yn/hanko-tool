@@ -206,7 +206,7 @@ class ImagePlacer {
     const innerH = stampH - margin * 2;
 
     // 画像配置エリア（内枠から各辺0.5mm内側に余白）
-    const imagePadding = 0.5;
+    const imagePadding = 0.15;
     const imageAreaW = innerW - imagePadding * 2;
     const imageAreaH = innerH - imagePadding * 2;
 
@@ -404,7 +404,7 @@ class ImagePlacer {
     const margin = frame.stampMargin !== undefined ? frame.stampMargin : category.margin;
     const innerW = frame.stampWidth - margin * 2;
     const innerH = frame.stampHeight - margin * 2;
-    const imagePadding = 0.5;
+    const imagePadding = 0.15;
     const imageAreaW = innerW - imagePadding * 2;
     const imageAreaH = innerH - imagePadding * 2;
 
