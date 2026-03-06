@@ -425,7 +425,8 @@ class CanvasManager {
       if (opt.e.altKey || opt.e.button === 1) return;
       const target = opt.target;
 
-      if (target && target.isStampFrame) {
+      // スタンプ枠と配置済み画像の両方を2段階タッチ対象にする
+      if (target && (target.isStampFrame || target.isPlacedImage)) {
         if (this.activatedFrame === target) {
           // 既にアクティブ → そのまま移動可能
         } else if (activeBeforeDown === target && !this.activatedFrame) {
@@ -438,7 +439,7 @@ class CanvasManager {
           target._frozenLeft = target.left;
           target._frozenTop = target.top;
 
-          // 前のアクティブ枠をリセット
+          // 前のアクティブをリセット
           if (this.activatedFrame) {
             this.activatedFrame.set({ lockMovementX: true, lockMovementY: true });
             this._updateFrameAppearance(this.activatedFrame, false);
@@ -448,7 +449,7 @@ class CanvasManager {
           this.canvas.requestRenderAll();
         }
       } else {
-        // 空白クリック: アクティブ枠リセット
+        // 空白クリック: アクティブリセット
         if (this.activatedFrame) {
           this.activatedFrame.set({ lockMovementX: true, lockMovementY: true });
           this._updateFrameAppearance(this.activatedFrame, false);
@@ -457,10 +458,10 @@ class CanvasManager {
       }
     });
 
-    // 未アクティブの枠が移動しようとしたら強制的に元の位置に戻す（長押しドラッグ対策）
+    // 未アクティブのオブジェクトが移動しようとしたら強制的に元の位置に戻す（長押しドラッグ対策）
     this.canvas.on('object:moving', (opt) => {
       const target = opt.target;
-      if (target && target.isStampFrame && this.activatedFrame !== target) {
+      if (target && (target.isStampFrame || target.isPlacedImage) && this.activatedFrame !== target) {
         if (target._frozenLeft !== undefined) {
           target.set({ left: target._frozenLeft, top: target._frozenTop });
         }
