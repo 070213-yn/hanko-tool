@@ -110,10 +110,12 @@ class ImagePlacer {
         return;
       }
 
-      // キャンバスがあるレイヤーを画像として追加
+      // キャンバスがあるレイヤーを画像として追加（iPad対応: トリミング）
       if (layer.canvas) {
+        const trimmed = this._trimLayerCanvas(layer.canvas);
+        if (!trimmed) return; // 完全に透明なレイヤーはスキップ
         const layerName = prefix ? `${prefix}/${layer.name || 'レイヤー'}` : (layer.name || 'レイヤー');
-        const dataURL = layer.canvas.toDataURL('image/png');
+        const dataURL = trimmed.toDataURL('image/png');
         const id = this._addImage(layerName, dataURL);
         addedIds.push(id);
       }
@@ -559,6 +561,65 @@ class ImagePlacer {
     if (this.selectedId === id) this.selectedId = null;
     this.renderList();
     this.cm.getCanvas().requestRenderAll();
+  }
+
+  // レイヤーキャンバスの描画部分だけをトリミング
+  // iPadアプリではレイヤーがキャンバス全体サイズになっていることがあるため必須
+  _trimLayerCanvas(srcCanvas) {
+    const w = srcCanvas.width;
+    const h = srcCanvas.height;
+    if (w === 0 || h === 0) return null;
+
+    const ctx = srcCanvas.getContext('2d');
+    let imageData;
+    try {
+      imageData = ctx.getImageData(0, 0, w, h);
+    } catch (e) {
+      return srcCanvas; // CORSエラー等の場合はそのまま返す
+    }
+    const data = imageData.data;
+
+    // 上端を探索
+    let minY = -1;
+    for (let y = 0; y < h && minY < 0; y++) {
+      for (let x = 0; x < w; x++) {
+        if (data[(y * w + x) * 4 + 3] > 0) { minY = y; break; }
+      }
+    }
+    if (minY < 0) return null; // 完全に透明
+
+    // 下端を探索
+    let maxY = minY;
+    for (let y = h - 1; y > minY; y--) {
+      for (let x = 0; x < w; x++) {
+        if (data[(y * w + x) * 4 + 3] > 0) { maxY = y; break; }
+      }
+      if (maxY > minY) break;
+    }
+
+    // 左端・右端を探索
+    let minX = w, maxX = 0;
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = 0; x < minX; x++) {
+        if (data[(y * w + x) * 4 + 3] > 0) { minX = x; break; }
+      }
+      for (let x = w - 1; x > maxX; x--) {
+        if (data[(y * w + x) * 4 + 3] > 0) { maxX = x; break; }
+      }
+    }
+
+    const trimW = maxX - minX + 1;
+    const trimH = maxY - minY + 1;
+
+    // 元のサイズと大差なければトリミング不要
+    if (trimW >= w * 0.95 && trimH >= h * 0.95) return srcCanvas;
+
+    const trimmed = document.createElement('canvas');
+    trimmed.width = trimW;
+    trimmed.height = trimH;
+    trimmed.getContext('2d').drawImage(srcCanvas, minX, minY, trimW, trimH, 0, 0, trimW, trimH);
+
+    return trimmed;
   }
 
   // === 描画部分（非透明ピクセル）のバウンディングボックスを検出 ===

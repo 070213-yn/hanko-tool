@@ -1,67 +1,92 @@
 // 枠オブジェクト生成（外枠+内枠+ラベルのグループ）
-// メモテキスト・画像配置対応
 
 class FrameFactory {
   constructor(canvasManager) {
     this.cm = canvasManager;
-    this.nextX = 5;
-    this.nextY = 10; // タイトル分の余白
-    this.rowMaxHeight = 0;
-    this.padding = 3;
-    this.memoObjects = new Map(); // frameUniqueId → fabric.Text
-    this.imageObjects = new Map(); // frameUniqueId → fabric.Image
-    this._frameCounter = 0;
+    this.nextX = 5;  // 次に配置するX座標（mm）
+    this.nextY = 10; // 次に配置するY座標（mm）タイトル分の余白確保
+    this.rowMaxHeight = 0; // 現在行の最大高さ
+    this.padding = 3; // 枠間の余白（mm）
   }
 
   // スタンプ枠を作成してキャンバスに追加
-  createFrame(stamp, category) {
+  // posOverride: { left, top } を渡すと自動配置の代わりにその位置に配置
+  createFrame(stamp, category, posOverride) {
     const { width, height } = stamp;
-    const margin = category.margin;
-    this._frameCounter++;
-    const uniqueId = `${stamp.id}_${this._frameCounter}`;
+    // スタンプ個別の余白があればそちらを優先、なければカテゴリの余白を使用
+    const margin = (stamp.margin !== undefined && stamp.margin !== null) ? stamp.margin : category.margin;
 
-    // 内枠（印面サイズ）
+    // 内枠（印面サイズ）- 赤破線
     const innerW = width - margin * 2;
     const innerH = height - margin * 2;
 
     const innerRect = new fabric.Rect({
-      width: innerW, height: innerH, left: margin, top: margin,
+      width: innerW,
+      height: innerH,
+      left: margin,
+      top: margin,
       fill: 'transparent',
       stroke: category.innerStroke,
       strokeWidth: 0.3,
       strokeDashArray: category.innerStrokeDash,
-      selectable: false, evented: false,
+      selectable: false,
+      evented: false,
     });
 
-    // 外枠
+    // 外枠 - メーカー色
     const outerRect = new fabric.Rect({
-      width: width, height: height, left: 0, top: 0,
+      width: width,
+      height: height,
+      left: 0,
+      top: 0,
       fill: 'rgba(255, 255, 255, 0.5)',
       stroke: category.outerStroke,
       strokeWidth: 0.4,
       strokeDashArray: category.outerStrokeDash,
-      selectable: false, evented: false,
+      selectable: false,
+      evented: false,
     });
 
-    // ラベル
-    const fontSize = Math.max(3, Math.min(8, Math.min(width, height) * 0.3));
-    const label = new fabric.Text(stamp.id, {
-      fontSize: fontSize,
+    // サイズ表記（外枠の右下外側に表示）
+    const sizeDisplay = new fabric.Text(`${stamp.id} ${width}×${height}`, {
+      fontSize: 2.5,
       fill: category.labelColor,
       fontFamily: 'sans-serif',
-      fontWeight: 'bold',
-      selectable: false, evented: false,
-      originX: 'center', originY: 'center',
-      left: width / 2, top: height / 2,
-      opacity: 0.4,
+      fontWeight: '500',
+      selectable: false,
+      evented: false,
+      originX: 'right',
+      originY: 'top',
+      left: width,
+      top: height + 0.3,
+      opacity: 0.55,
+      isSizeLabel: true,
+    });
+
+    // メモ表示（サイズ表記の下の行に配置、折り返し対応）
+    // グループのバウンディングボックスを崩さないよう left: 0 にする
+    const memoDisplay = new fabric.Textbox('', {
+      fontSize: 2.2,
+      fill: '#000000',
+      fontFamily: 'sans-serif',
+      fontWeight: '400',
+      selectable: false,
+      evented: false,
+      originX: 'left',
+      originY: 'top',
+      left: 0,
+      top: height + 3,
+      width: Math.max(width, 20),
+      opacity: 1.0,
+      splitByGrapheme: true,
+      isMemoLabel: true,
     });
 
     // グループ化
-    const group = new fabric.Group([outerRect, innerRect, label], {
-      left: 0, top: 0,
-      // 初期状態: 移動ロック（2段階タッチの1回目で選択だけ）
-      lockMovementX: true,
-      lockMovementY: true,
+    const group = new fabric.Group([outerRect, innerRect, sizeDisplay, memoDisplay], {
+      left: 0,
+      top: 0,
+      // 拡縮・回転をロック
       lockScalingX: true,
       lockScalingY: true,
       lockRotation: true,
@@ -71,25 +96,24 @@ class FrameFactory {
       borderScaleFactor: 1.5,
       // カスタムプロパティ
       isStampFrame: true,
-      frameUniqueId: uniqueId,
       stampId: stamp.id,
       stampWidth: width,
       stampHeight: height,
       stampMargin: margin,
+      stampMemo: '',
       categoryName: category.name,
-      // PSD書き出し用の色情報
-      outerStrokeColor: category.outerStroke,
-      outerStrokeDashPx: category.outerStrokeDash,
-      innerStrokeColor: category.innerStroke,
-      // メモ・画像
-      memoText: '',
-      placedImage: null, // Canvasオブジェクト（エクスポート用）
+      _category: category,
     });
 
-    // 配置位置を計算
-    const pos = this._getNextPosition(width, height);
-    group.set({ left: pos.x, top: pos.y });
+    // 配置位置を計算（位置指定がある場合はそちらを使用）
+    if (posOverride && posOverride.left !== undefined) {
+      group.set({ left: posOverride.left, top: posOverride.top });
+    } else {
+      const pos = this._getNextPosition(width, height);
+      group.set({ left: pos.x, top: pos.y });
+    }
 
+    // キャンバスに追加
     const canvas = this.cm.getCanvas();
     canvas.add(group);
     canvas.setActiveObject(group);
@@ -98,22 +122,31 @@ class FrameFactory {
     // グリッドスナップイベント
     this._setupSnap(group);
 
+    // 画像配置の枠追従イベントを設定
+    if (window.imagePlacer) {
+      window.imagePlacer.setupFrameTracking(group);
+    }
+
+    // 配置数を更新
     this._updateFrameCount();
+
     return group;
   }
 
-  // 次の配置位置を計算
-  _getNextPosition(width, height) {
-    // メモ用余白（5mm）を考慮
-    const effectiveH = height + 5;
+  // 次の配置位置を計算（横方向に並べ、はみ出したら改行）
+  // extraH: メモ等の追加高さ（mm）。省略時はサイズ表記分の4mm
+  _getNextPosition(width, height, extraH) {
+    const totalH = height + (extraH !== undefined ? extraH : 4);
 
+    // 横方向に入らなければ改行
     if (this.nextX + width > FRAME_DATA.A4_WIDTH - 3) {
       this.nextX = 5;
       this.nextY += this.rowMaxHeight + this.padding;
       this.rowMaxHeight = 0;
     }
 
-    if (this.nextY + height > FRAME_DATA.A4_HEIGHT - 3) {
+    // 縦方向もはみ出す場合は左上に戻す
+    if (this.nextY + totalH > FRAME_DATA.A4_HEIGHT - 3) {
       this.nextX = 5;
       this.nextY = 10;
       this.rowMaxHeight = 0;
@@ -122,8 +155,9 @@ class FrameFactory {
     const x = this.cm.snapToGrid(this.nextX);
     const y = this.cm.snapToGrid(this.nextY);
 
+    // 次の位置を更新
     this.nextX += width + this.padding;
-    this.rowMaxHeight = Math.max(this.rowMaxHeight, effectiveH);
+    this.rowMaxHeight = Math.max(this.rowMaxHeight, totalH);
 
     return { x, y };
   }
@@ -134,18 +168,14 @@ class FrameFactory {
       const snappedLeft = this.cm.snapToGrid(obj.left);
       const snappedTop = this.cm.snapToGrid(obj.top);
       obj.set({ left: snappedLeft, top: snappedTop });
-
-      // メモテキストも追従
-      this._updateMemoPosition(obj);
-      // 画像も追従
-      this._updateImagePosition(obj);
     });
 
+    // 移動後にA4内に収まるようクランプ
     obj.on('modified', () => {
       let left = obj.left;
       let top = obj.top;
-      const w = obj.stampWidth;
-      const h = obj.stampHeight;
+      const w = obj.width * (obj.scaleX || 1);
+      const h = obj.height * (obj.scaleY || 1);
 
       left = Math.max(0, Math.min(left, FRAME_DATA.A4_WIDTH - w));
       top = Math.max(0, Math.min(top, FRAME_DATA.A4_HEIGHT - h));
@@ -155,138 +185,263 @@ class FrameFactory {
         top: this.cm.snapToGrid(top),
       });
       obj.setCoords();
-
-      this._updateMemoPosition(obj);
-      this._updateImagePosition(obj);
       this.cm.getCanvas().requestRenderAll();
     });
-  }
-
-  // === メモ機能 ===
-
-  // メモを設定/更新
-  setMemo(frame, text) {
-    frame.memoText = text;
-    const canvas = this.cm.getCanvas();
-    const uid = frame.frameUniqueId;
-
-    if (!text) {
-      const existing = this.memoObjects.get(uid);
-      if (existing) {
-        canvas.remove(existing);
-        this.memoObjects.delete(uid);
-      }
-      canvas.requestRenderAll();
-      return;
-    }
-
-    let memoObj = this.memoObjects.get(uid);
-    if (memoObj) {
-      memoObj.set({ text: text });
-    } else {
-      memoObj = new fabric.Text(text, {
-        fontSize: 2.5,
-        fill: '#555555',
-        fontFamily: 'sans-serif',
-        selectable: false,
-        evented: false,
-        isMemoText: true,
-        linkedFrameId: uid,
-      });
-      canvas.add(memoObj);
-      this.memoObjects.set(uid, memoObj);
-    }
-
-    memoObj.set({
-      left: frame.left,
-      top: frame.top + frame.stampHeight + 1,
-    });
-    canvas.requestRenderAll();
-  }
-
-  // メモの位置を枠に追従
-  _updateMemoPosition(frame) {
-    const memoObj = this.memoObjects.get(frame.frameUniqueId);
-    if (memoObj) {
-      memoObj.set({
-        left: frame.left,
-        top: frame.top + frame.stampHeight + 1,
-      });
-    }
-  }
-
-  // === 画像配置 ===
-
-  // PSDレイヤー画像を枠に配置
-  placeImage(frame, layerCanvas) {
-    const canvas = this.cm.getCanvas();
-    const uid = frame.frameUniqueId;
-    const margin = frame.stampMargin;
-
-    // エクスポート用に元画像を保持
-    frame.placedImage = layerCanvas;
-
-    // 既存画像を削除
-    const existing = this.imageObjects.get(uid);
-    if (existing) canvas.remove(existing);
-
-    // 内枠サイズに合わせてスケーリング
-    const innerW = frame.stampWidth - margin * 2;
-    const innerH = frame.stampHeight - margin * 2;
-
-    const imgElement = new Image();
-    imgElement.onload = () => {
-      const fabricImg = new fabric.Image(imgElement, {
-        selectable: false,
-        evented: false,
-        isPlacedImage: true,
-        linkedFrameId: uid,
-      });
-
-      const scaleX = innerW / fabricImg.width;
-      const scaleY = innerH / fabricImg.height;
-      const fitScale = Math.min(scaleX, scaleY);
-
-      fabricImg.set({
-        scaleX: fitScale,
-        scaleY: fitScale,
-        left: frame.left + margin + (innerW - fabricImg.width * fitScale) / 2,
-        top: frame.top + margin + (innerH - fabricImg.height * fitScale) / 2,
-      });
-
-      canvas.add(fabricImg);
-      // 画像を枠の下に（枠線が上に見える）
-      const frameIdx = canvas.getObjects().indexOf(frame);
-      if (frameIdx > 0) {
-        canvas.moveTo(fabricImg, frameIdx);
-      }
-
-      this.imageObjects.set(uid, fabricImg);
-      canvas.requestRenderAll();
-    };
-    imgElement.src = layerCanvas.toDataURL();
-  }
-
-  // 画像の位置を枠に追従
-  _updateImagePosition(frame) {
-    const imgObj = this.imageObjects.get(frame.frameUniqueId);
-    if (imgObj) {
-      const margin = frame.stampMargin;
-      const innerW = frame.stampWidth - margin * 2;
-      const innerH = frame.stampHeight - margin * 2;
-
-      imgObj.set({
-        left: frame.left + margin + (innerW - imgObj.width * imgObj.scaleX) / 2,
-        top: frame.top + margin + (innerH - imgObj.height * imgObj.scaleY) / 2,
-      });
-    }
   }
 
   // 配置数表示を更新
   _updateFrameCount() {
     const count = this.cm.getStampFrames().length;
     const el = document.getElementById('frame-count');
-    if (el) el.textContent = `配置数: ${count}`;
+    if (el) {
+      const numEl = el.querySelector('.frame-counter-num');
+      if (numEl) {
+        numEl.textContent = count;
+      } else {
+        el.textContent = `配置数: ${count}`;
+      }
+    }
+  }
+
+  // メモの表示高さを計算（mm）
+  _getMemoHeight(frame) {
+    const memo = frame.stampMemo || '';
+    if (!memo) return 0;
+    const memoWidth = Math.max(frame.stampWidth, 20);
+    const fontSize = 2.2;
+    const lineHeight = fontSize * 1.3;
+    const charWidth = fontSize * 0.85; // 日本語文字の概算幅
+    const charsPerLine = Math.max(1, Math.floor(memoWidth / charWidth));
+    const numLines = Math.ceil(memo.length / charsPerLine);
+    return 3 + numLines * lineHeight; // 3mm（枠下からの距離）+ 行数分
+  }
+
+  // 全枠の位置から配置カウンターを再計算（Undo/Redo後に呼ぶ）
+  recalcNextPosition() {
+    const frames = this.cm.getStampFrames();
+    if (frames.length === 0) {
+      this.nextX = 5;
+      this.nextY = 10;
+      this.rowMaxHeight = 0;
+      return;
+    }
+
+    // 最下行のY座標を特定
+    const maxTop = Math.max(...frames.map(f => f.top));
+    const ROW_TOLERANCE = 1; // 同一行判定の誤差(mm)
+
+    // 最下行にある枠を抽出
+    const bottomRowFrames = frames.filter(f => Math.abs(f.top - maxTop) < ROW_TOLERANCE);
+
+    // 最下行の右端と最大高さを計算
+    let maxRight = 0;
+    let maxH = 0;
+    bottomRowFrames.forEach(f => {
+      const right = f.left + f.stampWidth;
+      if (right > maxRight) maxRight = right;
+      const memoH = this._getMemoHeight(f);
+      const effectiveH = f.stampHeight + Math.max(4, memoH);
+      if (effectiveH > maxH) maxH = effectiveH;
+    });
+
+    this.nextX = maxRight + this.padding;
+    this.nextY = maxTop;
+    this.rowMaxHeight = maxH;
+  }
+
+  // 選択中のスタンプ枠を別のスタンプに差し替え
+  replaceFrame(oldFrame, newStamp, newCategory) {
+    const canvas = this.cm.getCanvas();
+    const oldLeft = oldFrame.left;
+    const oldTop = oldFrame.top;
+
+    // 配置済み画像情報を保存
+    let placementInfo = null;
+    if (window.imagePlacer) {
+      placementInfo = window.imagePlacer.getPlacementInfo(oldFrame);
+    }
+
+    // 古い枠を削除
+    canvas.remove(oldFrame);
+
+    // 同じ位置に新しいスタンプ枠を作成
+    const newFrame = this.createFrame(newStamp, newCategory, { left: oldLeft, top: oldTop });
+
+    // 画像を新しい枠に再配置（自動的に新しい内枠サイズにフィット）
+    if (window.imagePlacer && placementInfo) {
+      window.imagePlacer.restorePlacement(newFrame, placementInfo);
+    }
+
+    // 重なり解消のため全枠を自動整列
+    this.rearrangeAll();
+
+    // 差し替えた枠を選択状態に
+    canvas.setActiveObject(newFrame);
+
+    return newFrame;
+  }
+
+  // 全枠を自動整列（重なりを解消して詰め直す）
+  rearrangeAll() {
+    const canvas = this.cm.getCanvas();
+    const frames = this.cm.getStampFrames();
+    if (frames.length === 0) return;
+
+    // キャンバス上の配置済み画像を取得（_linkedFrameUidで枠と紐づいている）
+    const placedImages = canvas.getObjects().filter(o => o.isPlacedImage);
+
+    // 現在の位置順でソート（上→下、同じ行なら左→右）
+    frames.sort((a, b) => {
+      if (Math.abs(a.top - b.top) > 5) return a.top - b.top;
+      return a.left - b.left;
+    });
+
+    // 配置位置をリセット
+    this.nextX = 5;
+    this.nextY = 10;
+    this.rowMaxHeight = 0;
+
+    // 各枠を再配置（メモの高さも考慮）
+    frames.forEach(frame => {
+      const oldLeft = frame.left;
+      const oldTop = frame.top;
+      const memoH = this._getMemoHeight(frame);
+      const extraH = Math.max(4, memoH);
+      const pos = this._getNextPosition(frame.stampWidth, frame.stampHeight, extraH);
+      frame.set({ left: pos.x, top: pos.y });
+      frame.setCoords();
+
+      const dx = pos.x - oldLeft;
+      const dy = pos.y - oldTop;
+      if (dx === 0 && dy === 0) return;
+
+      // この枠に紐づく画像をキャンバスから直接探して移動
+      const frameUid = frame._placerUid;
+      if (!frameUid) return;
+
+      placedImages.forEach(img => {
+        if (img._linkedFrameUid === frameUid) {
+          img.set({
+            left: img.left + dx,
+            top: img.top + dy,
+          });
+          // clipPathも同じ距離だけ移動
+          if (img.clipPath) {
+            img.clipPath.set({
+              left: img.clipPath.left + dx,
+              top: img.clipPath.top + dy,
+            });
+          }
+          img.setCoords();
+          img.dirty = true; // Fabric.jsに再描画を強制
+        }
+      });
+    });
+
+    canvas.renderAll();
+  }
+
+  // 選択中のスタンプ枠を90度回転（縦横切替）
+  rotateSelected() {
+    const canvas = this.cm.getCanvas();
+    const active = canvas.getActiveObjects();
+    const frames = active.filter(o => o.isStampFrame);
+    if (frames.length === 0) return;
+
+    canvas.discardActiveObject();
+
+    const newFrames = [];
+
+    frames.forEach(frame => {
+      const oldLeft = frame.left;
+      const oldTop = frame.top;
+      const cat = frame._category;
+
+      // 配置済み画像情報を保存
+      let placementInfo = null;
+      if (window.imagePlacer) {
+        placementInfo = window.imagePlacer.getPlacementInfo(frame);
+      }
+
+      // 幅と高さを入れ替えた新しいスタンプ定義
+      const swappedStamp = {
+        id: frame.stampId,
+        width: frame.stampHeight,
+        height: frame.stampWidth,
+      };
+
+      // 古い枠を削除
+      canvas.remove(frame);
+
+      // 同じ位置に縦横入替えた新しい枠を作成
+      const newFrame = this.createFrame(swappedStamp, cat, { left: oldLeft, top: oldTop });
+
+      // 画像を再配置
+      if (window.imagePlacer && placementInfo) {
+        window.imagePlacer.restorePlacement(newFrame, placementInfo);
+      }
+
+      newFrames.push(newFrame);
+    });
+
+    // 新しい枠を選択状態に
+    if (newFrames.length === 1) {
+      canvas.setActiveObject(newFrames[0]);
+    } else if (newFrames.length > 1) {
+      const sel = new fabric.ActiveSelection(newFrames, { canvas });
+      canvas.setActiveObject(sel);
+    }
+
+    canvas.requestRenderAll();
+  }
+
+  // 選択中のスタンプ枠を複製（自動配置位置に新しい枠を作成）
+  duplicateSelected() {
+    const canvas = this.cm.getCanvas();
+    const activeObjects = canvas.getActiveObjects();
+    const frames = activeObjects.filter(o => o.isStampFrame);
+    if (frames.length === 0) return;
+
+    canvas.discardActiveObject();
+
+    const newFrames = [];
+    frames.forEach(frame => {
+      // 配置済み画像情報を保存（元の枠から切り離さずにコピー用の情報だけ取得）
+      let placementInfo = null;
+      if (window.imagePlacer) {
+        const uid = window.imagePlacer._getFrameUid(frame);
+        const placement = window.imagePlacer.placements[uid];
+        if (placement) {
+          placementInfo = { imageId: placement.imageId };
+        }
+      }
+
+      const stamp = {
+        id: frame.stampId,
+        width: frame.stampWidth,
+        height: frame.stampHeight,
+      };
+      const cat = frame._category;
+      // 自動配置位置に新しい枠を作成（posOverrideなし）
+      const newFrame = this.createFrame(stamp, cat);
+
+      // 画像を新しい枠にも配置（元の枠の画像はそのまま残す）
+      if (window.imagePlacer && placementInfo) {
+        window.imagePlacer.restorePlacement(newFrame, placementInfo);
+      }
+
+      newFrames.push(newFrame);
+    });
+
+    // 新しい枠を選択状態に
+    if (newFrames.length === 1) {
+      canvas.setActiveObject(newFrames[0]);
+    } else if (newFrames.length > 1) {
+      const sel = new fabric.ActiveSelection(newFrames, { canvas });
+      canvas.setActiveObject(sel);
+    }
+
+    canvas.requestRenderAll();
   }
 
   // 選択中のオブジェクトを削除
@@ -297,18 +452,28 @@ class FrameFactory {
 
     activeObjects.forEach(obj => {
       if (obj.isStampFrame) {
-        const uid = obj.frameUniqueId;
-        const memo = this.memoObjects.get(uid);
-        if (memo) { canvas.remove(memo); this.memoObjects.delete(uid); }
-        const img = this.imageObjects.get(uid);
-        if (img) { canvas.remove(img); this.imageObjects.delete(uid); }
+        // 配置済み画像のクリーンアップ
+        if (window.imagePlacer) {
+          window.imagePlacer.onFrameRemoved(obj);
+        }
         canvas.remove(obj);
       }
     });
     canvas.discardActiveObject();
     canvas.requestRenderAll();
     this._updateFrameCount();
-    document.dispatchEvent(new CustomEvent('frame-deselected'));
+  }
+
+  // スタンプ枠のメモを更新
+  updateMemo(frame, text) {
+    frame.stampMemo = text || '';
+    const objects = frame.getObjects();
+    const memoObj = objects.find(o => o.isMemoLabel);
+    if (memoObj) {
+      memoObj.set('text', text || '');
+      frame.dirty = true;
+      this.cm.getCanvas().requestRenderAll();
+    }
   }
 
   // 全スタンプ枠を削除
@@ -316,22 +481,19 @@ class FrameFactory {
     const canvas = this.cm.getCanvas();
     const frames = this.cm.getStampFrames();
     frames.forEach(f => {
-      const uid = f.frameUniqueId;
-      const memo = this.memoObjects.get(uid);
-      if (memo) canvas.remove(memo);
-      const img = this.imageObjects.get(uid);
-      if (img) canvas.remove(img);
+      // 配置済み画像のクリーンアップ
+      if (window.imagePlacer) {
+        window.imagePlacer.onFrameRemoved(f);
+      }
       canvas.remove(f);
     });
-    this.memoObjects.clear();
-    this.imageObjects.clear();
     canvas.discardActiveObject();
     canvas.requestRenderAll();
 
+    // 配置位置をリセット
     this.nextX = 5;
     this.nextY = 10;
     this.rowMaxHeight = 0;
     this._updateFrameCount();
-    document.dispatchEvent(new CustomEvent('frame-deselected'));
   }
 }
