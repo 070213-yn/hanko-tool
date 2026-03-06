@@ -4,449 +4,122 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>はんこどり - 画像二値化ツール</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: { extend: { fontFamily: { sans: ['"Noto Sans JP"', 'sans-serif'] } } }
-    };
-  </script>
-  <!-- JSZip: 一括ダウンロード用 -->
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <!-- ag-psd: PSD書出し用 -->
-  <script src="https://cdn.jsdelivr.net/npm/ag-psd@30.1.0/dist/bundle.js"></script>
   <style>
-    body { font-family: 'Noto Sans JP', sans-serif; }
-
     .drop-zone {
       border: 3px dashed #d1d5db;
-      border-radius: 16px;
-      padding: 48px 32px;
+      border-radius: 12px;
+      padding: 60px 40px;
       text-align: center;
       cursor: pointer;
-      transition: all 0.25s;
-      background: rgba(255,255,255,0.6);
+      transition: all 0.2s;
     }
     .drop-zone:hover,
     .drop-zone.drag-over {
-      border-color: #6366f1;
-      background: rgba(238, 242, 255, 0.8);
-      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.1);
+      border-color: #2563eb;
+      background: #eff6ff;
     }
-
-    /* 画像カード */
-    .image-card {
-      background: rgba(255,255,255,0.8);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(0,0,0,0.06);
-      border-radius: 16px;
-      padding: 16px;
-      transition: box-shadow 0.2s;
-    }
-    .image-card:hover {
-      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
-    }
-
-    /* プレビュー */
-    .preview-wrap {
+    .preview-canvas-wrap {
+      max-width: 100%;
+      overflow: auto;
       border: 1px solid #e5e7eb;
       border-radius: 8px;
-      overflow: hidden;
-      background: repeating-conic-gradient(#f3f4f6 0% 25%, #fff 0% 50%) 50% / 16px 16px;
+      background: repeating-conic-gradient(#f3f4f6 0% 25%, #fff 0% 50%) 50% / 20px 20px;
     }
-    .preview-wrap canvas {
-      width: 100%;
+    .preview-canvas-wrap canvas {
+      max-width: 100%;
       height: auto;
       display: block;
     }
-
-    /* スライダー */
-    input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      height: 6px;
-      background: linear-gradient(to right, #c7d2fe, #e0e7ff);
-      border-radius: 3px;
-      outline: none;
-    }
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: #6366f1;
-      box-shadow: 0 1px 4px rgba(99,102,241,0.3);
-      cursor: pointer;
-    }
-
-    /* ボタン */
-    .btn-primary {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 16px; font-size: 13px; font-weight: 600;
-      color: #fff; background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      border: none; border-radius: 10px; cursor: pointer;
-      box-shadow: 0 2px 8px rgba(99,102,241,0.25);
-      transition: all 0.2s;
-    }
-    .btn-primary:hover { box-shadow: 0 4px 16px rgba(99,102,241,0.35); transform: translateY(-1px); }
-    .btn-primary:active { transform: translateY(0); }
-    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
-
-    .btn-secondary {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 7px 14px; font-size: 12px; font-weight: 600;
-      color: #6366f1; background: rgba(99,102,241,0.08);
-      border: 1px solid rgba(99,102,241,0.15); border-radius: 8px;
-      cursor: pointer; transition: all 0.2s;
-    }
-    .btn-secondary:hover { background: rgba(99,102,241,0.14); }
-
-    .btn-sm {
-      padding: 5px 10px; font-size: 11px; font-weight: 600;
-      border-radius: 6px; cursor: pointer; transition: all 0.15s;
-      border: 1px solid; display: inline-flex; align-items: center; gap: 4px;
-    }
-    .btn-auto {
-      color: #6366f1; background: rgba(99,102,241,0.06);
-      border-color: rgba(99,102,241,0.15);
-    }
-    .btn-auto:hover { background: rgba(99,102,241,0.12); }
-    .btn-dl {
-      color: #059669; background: rgba(16,185,129,0.06);
-      border-color: rgba(16,185,129,0.15);
-    }
-    .btn-dl:hover { background: rgba(16,185,129,0.12); }
-    .btn-remove {
-      color: #dc2626; background: rgba(239,68,68,0.06);
-      border-color: rgba(239,68,68,0.12);
-    }
-    .btn-remove:hover { background: rgba(239,68,68,0.12); }
-
-    /* カウントバッジ */
-    .count-badge {
-      display: inline-flex; align-items: center; justify-content: center;
-      min-width: 20px; height: 20px; padding: 0 6px;
-      font-size: 11px; font-weight: 700; color: #fff;
-      background: #6366f1; border-radius: 10px;
-    }
-
-    /* コントロール行 */
-    .controls-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .controls-divider {
-      width: 1px;
-      height: 20px;
-      background: #e5e7eb;
-      flex-shrink: 0;
-    }
-    @media (max-width: 639px) {
-      .controls-divider { display: none; }
-      .controls-row { gap: 8px; }
-    }
-
-    /* 回転ボタン */
-    .btn-rotate {
-      color: #7c3aed; background: rgba(139,92,246,0.06);
-      border-color: rgba(139,92,246,0.15);
-    }
-    .btn-rotate:hover { background: rgba(139,92,246,0.12); }
-
-    /* ノイズ除去スライダー */
-    .noise-slider {
-      min-width: 160px;
-      flex: 1;
-    }
-
-    /* 消しゴムトグル */
-    .eraser-toggle {
-      display: inline-flex; align-items: center; gap: 3px;
-      padding: 3px 8px; font-size: 11px; font-weight: 600;
-      color: #6b7280; background: rgba(107,114,128,0.06);
-      border: 1px solid rgba(107,114,128,0.15);
-      border-radius: 6px; cursor: pointer;
-      transition: all 0.15s;
-    }
-    .eraser-toggle:hover { background: rgba(107,114,128,0.12); }
-    .eraser-toggle.active {
-      color: #fff;
-      background: #f59e0b;
-      border-color: #f59e0b;
-      box-shadow: 0 1px 4px rgba(245,158,11,0.3);
-    }
-
-    /* 消しゴムコントロール */
-    .eraser-controls {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 6px;
-      padding: 6px 10px;
-      background: rgba(245,158,11,0.06);
-      border: 1px solid rgba(245,158,11,0.12);
-      border-radius: 8px;
-    }
-    .eraser-size-slider {
-      width: 80px;
-    }
-
-    /* 消しゴムモード時のキャンバスラッパー */
-    .eraser-canvas-wrap.eraser-mode {
-      cursor: crosshair;
-      border-color: #f59e0b;
-      box-shadow: 0 0 0 2px rgba(245,158,11,0.2);
-    }
-
-    /* ペンモード時のキャンバスラッパー */
-    .eraser-canvas-wrap.pen-mode {
-      cursor: crosshair;
-      border-color: #6366f1;
-      box-shadow: 0 0 0 2px rgba(99,102,241,0.25);
-    }
-
-    /* 投げ縄モード時のキャンバスラッパー */
-    .eraser-canvas-wrap.lasso-mode {
-      cursor: crosshair;
-      border-color: #10b981;
-      box-shadow: 0 0 0 2px rgba(16,185,129,0.25);
-    }
-
-    /* ペンツールトグル */
-    .pen-toggle {
-      display: inline-flex; align-items: center; gap: 3px;
-      padding: 3px 8px; font-size: 11px; font-weight: 600;
-      color: #6b7280; background: rgba(107,114,128,0.06);
-      border: 1px solid rgba(107,114,128,0.15);
-      border-radius: 6px; cursor: pointer;
-      transition: all 0.15s;
-    }
-    .pen-toggle:hover { background: rgba(107,114,128,0.12); }
-    .pen-toggle.active {
-      color: #fff;
-      background: #6366f1;
-      border-color: #6366f1;
-      box-shadow: 0 1px 4px rgba(99,102,241,0.3);
-    }
-
-    /* 投げ縄トグル */
-    .lasso-toggle {
-      display: inline-flex; align-items: center; gap: 3px;
-      padding: 3px 8px; font-size: 11px; font-weight: 600;
-      color: #6b7280; background: rgba(107,114,128,0.06);
-      border: 1px solid rgba(107,114,128,0.15);
-      border-radius: 6px; cursor: pointer;
-      transition: all 0.15s;
-    }
-    .lasso-toggle:hover { background: rgba(107,114,128,0.12); }
-    .lasso-toggle.active {
-      color: #fff;
-      background: #10b981;
-      border-color: #10b981;
-      box-shadow: 0 1px 4px rgba(16,185,129,0.3);
-    }
-
-    /* カーソル表示用 */
-    .tool-cursor {
-      position: absolute;
-      border-radius: 50%;
-      border: 1.5px solid;
-      pointer-events: none;
-      display: none;
-      transform: translate(-50%, -50%);
-      z-index: 10;
-    }
-
-    /* 太さインジケーター */
-    .size-indicator {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      pointer-events: none;
-      z-index: 20;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    .size-indicator-circle {
-      background: #000;
-      border-radius: 50%;
-    }
-    .size-indicator-text {
-      font-size: 11px;
-      font-weight: 600;
-      color: #374151;
-      white-space: nowrap;
-    }
-
-    /* 変更適用ボタン */
-    .btn-apply {
-      color: #7c3aed; background: rgba(139,92,246,0.08);
-      border-color: rgba(139,92,246,0.2);
-    }
-    .btn-apply:hover { background: rgba(139,92,246,0.15); }
-
-    /* カード選択ハイライト */
-    .image-card.selected {
-      border-color: #6366f1;
-      box-shadow: 0 0 0 2px rgba(99,102,241,0.3), 0 4px 16px rgba(0,0,0,0.06);
-    }
-
-    /* 固定下部バー */
-    .fixed-bottom-bar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      z-index: 50;
-      background: rgba(255,255,255,0.95);
-      backdrop-filter: blur(12px);
-      border-top: 1px solid #e5e7eb;
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
-      padding: 10px 16px 12px;
-    }
-    .bottom-bar-title {
-      font-size: 12px;
-      font-weight: 600;
-      color: #6366f1;
-      margin-bottom: 6px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .bottom-bar-controls {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-    .bottom-bar-controls > div {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: #6b7280;
-      font-weight: 500;
-    }
-    .bottom-bar-controls input[type="range"] {
-      width: 100px;
-    }
-    .bottom-bar-controls .bar-val {
-      font-size: 11px;
-      font-family: monospace;
-      color: #374151;
-      min-width: 28px;
-      text-align: right;
-    }
-
-    /* disabled スライダー（グレーアウト） */
-    input[type="range"]:disabled {
-      opacity: 0.35;
-      cursor: not-allowed;
-    }
-
-    /* PSDボタン */
-    .btn-psd {
-      color: #7c3aed; background: rgba(139,92,246,0.06);
-      border-color: rgba(139,92,246,0.15);
-    }
-    .btn-psd:hover { background: rgba(139,92,246,0.12); }
-
-    /* 下部バーのツールボタン（縮小版） */
-    #bar-tools .pen-toggle,
-    #bar-tools .eraser-toggle,
-    #bar-tools .lasso-toggle {
-      padding: 4px 8px;
-      font-size: 11px;
-    }
   </style>
 </head>
-<body class="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 min-h-screen">
-  <div id="main-content" class="max-w-5xl mx-auto px-4 py-6" style="padding-bottom: 140px;">
+<body class="bg-gray-50 min-h-screen">
+  <div class="max-w-4xl mx-auto px-4 py-6">
     <!-- ヘッダー -->
     <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-xl font-bold text-gray-800">画像二値化ツール</h1>
-        <p class="text-xs text-gray-400 mt-0.5">複数画像を同時に処理、個別にしきい値調整可能</p>
-      </div>
-      <a href="index.html" class="btn-secondary">
-        <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clip-rule="evenodd"/></svg>
+      <h1 class="text-xl font-bold text-gray-800">画像二値化ツール</h1>
+      <a href="index.html" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
         入稿ツールに戻る
       </a>
     </div>
 
     <!-- ドロップゾーン -->
-    <div id="drop-zone" class="drop-zone mb-5">
-      <input type="file" id="file-input" accept="image/*" multiple class="hidden">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-10 h-10 text-gray-300 mx-auto mb-3">
-        <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
-      </svg>
-      <p class="text-gray-500 text-base mb-1">画像をドラッグ&ドロップ</p>
-      <p class="text-gray-400 text-sm">またはクリックしてファイルを選択（複数可）</p>
-      <p class="text-gray-300 text-xs mt-2">PNG, JPG, BMP 対応</p>
+    <div id="drop-zone" class="drop-zone mb-6">
+      <input type="file" id="file-input" accept="image/*" class="hidden">
+      <p class="text-gray-500 text-lg mb-2">画像をドラッグ&ドロップ</p>
+      <p class="text-gray-400 text-sm">またはクリックしてファイルを選択</p>
+      <p class="text-gray-400 text-xs mt-2">PNG, JPG, BMP 対応</p>
     </div>
 
-    <!-- ツールバー（画像がある時に表示） -->
-    <div id="toolbar" class="flex items-center gap-3 mb-5 flex-wrap" style="display: none;">
-      <button id="btn-add-more" class="btn-secondary">
-        <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
-        画像を追加
-      </button>
-      <button id="btn-auto-all" class="btn-secondary">
-        <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.598a.75.75 0 00-.75.75v3.634a.75.75 0 001.5 0v-2.033l.312.311a7 7 0 0011.712-3.138.75.75 0 00-1.06-.179zm-1.624-7.848a7 7 0 00-11.712 3.138.75.75 0 001.06.179 5.5 5.5 0 019.201-2.466l.312.311H10.117a.75.75 0 000 1.5h3.634a.75.75 0 00.75-.75V1.854a.75.75 0 00-1.5 0v2.033l-.312-.311z" clip-rule="evenodd"/></svg>
-        全て自動しきい値
-      </button>
-      <div class="flex-1"></div>
-      <span id="image-count" class="text-xs text-gray-400"></span>
-      <button id="btn-place-to-editor" class="btn-primary" style="background: linear-gradient(135deg, #059669, #10b981);">
-        <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M19 10a.75.75 0 00-.75-.75H8.704l1.048-.943a.75.75 0 10-1.004-1.114l-2.5 2.25a.75.75 0 000 1.114l2.5 2.25a.75.75 0 101.004-1.114l-1.048-.943h9.546A.75.75 0 0019 10z" clip-rule="evenodd"/></svg>
-        入稿シートに配置
-      </button>
-      <button id="btn-download-all" class="btn-primary">
-        <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"/><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/></svg>
-        一括ダウンロード (ZIP)
-      </button>
-      <button id="btn-psd-600" class="btn-sm btn-psd">PSD 600DPI</button>
-    </div>
-
-    <!-- 画像カード一覧 -->
-    <div id="image-list" class="space-y-4"></div>
-  </div>
-
-  <!-- 固定下部バー -->
-  <div id="bottom-bar" class="fixed-bottom-bar" style="display:none;">
-    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-      <div id="bottom-bar-title" class="bottom-bar-title" style="margin-bottom:0; flex:1;"></div>
-      <div style="display:flex; align-items:center; gap:4px;" id="bar-tools">
-        <button class="pen-toggle" id="bar-pen-btn" title="ペンモード">
-          <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z"/></svg>
-          ペン
-        </button>
-        <button class="eraser-toggle" id="bar-eraser-btn" title="消しゴムモード">
-          <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path d="M8.106 4.086a1.5 1.5 0 012.122 0l4.688 4.686a1.5 1.5 0 010 2.122L9.728 16.08a1.5 1.5 0 01-1.06.44H5.106a1.5 1.5 0 01-1.06-.44L2.106 14.14a1.5 1.5 0 010-2.122L8.106 4.086z"/></svg>
-          消しゴム
-        </button>
-        <button class="lasso-toggle" id="bar-lasso-btn" title="投げ縄モード">
-          <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z" clip-rule="evenodd"/></svg>
-          投げ縄
-        </button>
+    <!-- プレビューエリア -->
+    <div id="preview-area" class="hidden gap-4 mb-6" style="display: none;">
+      <div class="flex-1">
+        <div class="text-sm font-semibold text-gray-600 mb-2">元画像</div>
+        <div class="preview-canvas-wrap">
+          <canvas id="original-canvas"></canvas>
+        </div>
+      </div>
+      <div class="flex-1">
+        <div class="text-sm font-semibold text-gray-600 mb-2">二値化後（白=透明）</div>
+        <div class="preview-canvas-wrap">
+          <canvas id="preview-canvas"></canvas>
+        </div>
       </div>
     </div>
-    <div class="bottom-bar-controls">
-      <div>しきい値: <input type="range" id="bar-threshold" min="0" max="255" value="128"> <span id="bar-threshold-val" class="bar-val">128</span></div>
-      <div>ノイズ除去: <input type="range" id="bar-noise" min="0" max="50" value="5"> <span id="bar-noise-val" class="bar-val">5px</span></div>
-      <div>ツールサイズ: <input type="range" id="bar-tool-size" min="5" max="100" value="20"> <span id="bar-tool-size-val" class="bar-val">20</span></div>
+
+    <!-- コントロール -->
+    <div id="controls" class="hidden items-center gap-4 bg-white rounded-lg border border-gray-200 p-4" style="display: none;">
+      <div class="flex items-center gap-3 flex-1">
+        <label class="text-sm font-medium text-gray-700 whitespace-nowrap">しきい値:</label>
+        <input type="range" id="threshold-slider" min="0" max="255" value="128"
+               class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+        <span id="threshold-value" class="text-sm font-mono text-gray-600 w-8 text-right">128</span>
+      </div>
+      <button id="btn-auto-threshold"
+              class="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50">
+        自動
+      </button>
+      <button id="btn-download"
+              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+        PNGダウンロード
+      </button>
+    </div>
+
+    <!-- 新しい画像を読み込む -->
+    <div id="reload-area" class="hidden mt-4 text-center" style="display: none;">
+      <button id="btn-reload" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+        別の画像を読み込む
+      </button>
     </div>
   </div>
 
   <script src="js/binarize.js"></script>
+  <script>
+    // 別画像読み込みボタン
+    document.addEventListener('DOMContentLoaded', () => {
+      const reloadArea = document.getElementById('reload-area');
+      const btnReload = document.getElementById('btn-reload');
+      const fileInput = document.getElementById('file-input');
+      const dropZone = document.getElementById('drop-zone');
+      const previewArea = document.getElementById('preview-area');
+      const controls = document.getElementById('controls');
+
+      // プレビュー表示時にリロードボタンも表示
+      const observer = new MutationObserver(() => {
+        if (previewArea.style.display !== 'none') {
+          reloadArea.style.display = 'block';
+        }
+      });
+      observer.observe(previewArea, { attributes: true, attributeFilter: ['style'] });
+
+      btnReload.addEventListener('click', () => {
+        dropZone.style.display = '';
+        previewArea.style.display = 'none';
+        controls.style.display = 'none';
+        reloadArea.style.display = 'none';
+        fileInput.value = '';
+      });
+    });
+  </script>
 </body>
 </html>

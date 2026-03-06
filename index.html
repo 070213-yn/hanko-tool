@@ -5,192 +5,151 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>はんこどり - 入稿データ作成ツール</title>
 
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['"Noto Sans JP"', 'sans-serif'],
-          },
-        },
-      },
-    };
-  </script>
 
   <!-- Fabric.js v5 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 
-  <!-- ag-psd (PSD書出し用) -->
-  <script src="https://cdn.jsdelivr.net/npm/ag-psd@30.1.0/dist/bundle.js"></script>
+  <!-- ag-psd（PSD読み書き） -->
+  <script src="https://cdn.jsdelivr.net/npm/ag-psd@latest/dist/browser.min.js"></script>
 
   <!-- カスタムCSS -->
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
-  <!-- 背景グラデーション -->
-  <div class="bg-gradient"></div>
-  <div class="bg-gradient-orb orb-1"></div>
-  <div class="bg-gradient-orb orb-2"></div>
-  <div class="bg-gradient-orb orb-3"></div>
-
+<body class="bg-gray-100">
   <div id="app">
     <!-- ヘッダー -->
-    <header id="header">
-      <div class="header-inner">
-        <div class="flex items-center gap-3" style="min-width:0; flex-shrink:1;">
-          <div class="title-input-wrap">
-            <label class="text-[10px] text-gray-400 font-medium">タイトル:</label>
-            <input id="title-input" type="text" value="入稿データ" placeholder="入稿データ" class="title-input">
-            <div class="title-quick-btns">
-              <select id="title-maker" class="title-quick-select">
-                <option value="からふる屋様">からふる屋様</option>
-                <option value="ヤマダ様">ヤマダ様</option>
-              </select>
-              <select id="title-prefix" class="title-quick-select">
-                <option value="はんこどり">はんこどり</option>
-              </select>
-              <select id="title-year" class="title-quick-select">
-                <option value="2025">2025</option>
-                <option value="2026" selected>2026</option>
-                <option value="2027">2027</option>
-                <option value="2028">2028</option>
-                <option value="2029">2029</option>
-                <option value="2030">2030</option>
-                <option value="2031">2031</option>
-                <option value="2032">2032</option>
-                <option value="2033">2033</option>
-                <option value="2034">2034</option>
-                <option value="2035">2035</option>
-                <option value="2036">2036</option>
-                <option value="2037">2037</option>
-                <option value="2038">2038</option>
-                <option value="2039">2039</option>
-                <option value="2040">2040</option>
-              </select>
-              <span class="title-quick-label">年</span>
-              <select id="title-month" class="title-quick-select">
-                <option value="1">1</option><option value="2">2</option><option value="3">3</option>
-                <option value="4">4</option><option value="5">5</option><option value="6">6</option>
-                <option value="7">7</option><option value="8">8</option><option value="9">9</option>
-                <option value="10">10</option><option value="11">11</option><option value="12">12</option>
-              </select>
-              <span class="title-quick-label">月</span>
-              <select id="title-day" class="title-quick-select">
-                <option value="1">1</option><option value="2">2</option><option value="3">3</option>
-                <option value="4">4</option><option value="5">5</option><option value="6">6</option>
-                <option value="7">7</option><option value="8">8</option><option value="9">9</option>
-                <option value="10">10</option><option value="11">11</option><option value="12">12</option>
-                <option value="13">13</option><option value="14">14</option><option value="15">15</option>
-                <option value="16">16</option><option value="17">17</option><option value="18">18</option>
-                <option value="19">19</option><option value="20">20</option><option value="21">21</option>
-                <option value="22">22</option><option value="23">23</option><option value="24">24</option>
-                <option value="25">25</option><option value="26">26</option><option value="27">27</option>
-                <option value="28">28</option><option value="29">29</option><option value="30">30</option>
-                <option value="31">31</option>
-              </select>
-              <span class="title-quick-label">日</span>
-              <button id="title-btn-apply" class="title-quick-btn">適用</button>
-            </div>
-          </div>
-        </div>
-        <div class="flex items-center gap-2">
-          <div class="flex items-center gap-1">
-            <button class="undo-redo-btn" data-action="undo" disabled title="元に戻す (Ctrl+Z)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h10a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5H8M3 10l4-4M3 10l4 4"/></svg>
-            </button>
-            <button class="undo-redo-btn" data-action="redo" disabled title="やり直す (Ctrl+Shift+Z)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10H11a5 5 0 0 0-5 5v0a5 5 0 0 0 5 5h5M21 10l-4-4M21 10l-4 4"/></svg>
-            </button>
-          </div>
-          <label class="grid-toggle-label">
-            <input type="checkbox" id="grid-toggle" checked>
-            <span class="grid-toggle-track">
-              <span class="grid-toggle-thumb"></span>
-            </span>
-            <span class="text-xs text-gray-500">グリッド</span>
-          </label>
-          <a href="binarize.html" class="header-link">
-            <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-              <path d="M15.988 3.012A2.25 2.25 0 0118 5.25v6.5A2.25 2.25 0 0115.75 14H13.5v-3.379a3 3 0 00-.879-2.121l-3.12-3.121a3 3 0 00-1.402-.791 2.252 2.252 0 011.913-1.576A2.25 2.25 0 0112.25 1h1.5a2.25 2.25 0 012.238 2.012zM11.5 3.75a.75.75 0 00-1.5 0v2.5a.75.75 0 001.5 0v-2.5z"/>
-              <path d="M3.5 9.75A.75.75 0 014.25 9h.5a.75.75 0 01.75.75v7.5a.75.75 0 01-.75.75h-.5a.75.75 0 01-.75-.75v-7.5z"/>
-            </svg>
-            二値化ツール
-          </a>
-        </div>
+    <header id="header" class="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between gap-3">
+      <h1 class="text-lg font-bold text-gray-800 whitespace-nowrap">はんこどり</h1>
+      <div class="flex items-center gap-2 flex-1 min-w-0">
+        <label class="text-sm text-gray-600 whitespace-nowrap">タイトル:</label>
+        <input type="text" id="title-input"
+               placeholder="入稿データのタイトル"
+               class="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-400">
+      </div>
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-1 text-sm text-gray-600 cursor-pointer">
+          <input type="checkbox" id="grid-toggle" checked class="rounded">
+          <span>グリッド</span>
+        </label>
+        <a href="binarize.html" class="text-sm text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap">
+          二値化ツール
+        </a>
       </div>
     </header>
 
     <!-- メインコンテンツ -->
     <div id="main-content">
-      <!-- PC用サイドバー: スタンプ枠パネル -->
-      <aside id="sidebar" class="panel-collapsible">
-        <div class="panel-collapsed-label" title="スタンプ枠パネルを開く">スタンプ枠</div>
-        <button class="panel-collapse-btn" data-target="sidebar" title="折りたたむ">
-          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd"/></svg>
-        </button>
-        <div class="sidebar-inner">
-          <!-- メーカー選択タブ -->
-          <div class="maker-tabs">
-            <button class="maker-tab active" data-maker="karafuruya">
-              <span class="maker-tab-dot" style="background: #000"></span>
-              からふる屋
-            </button>
-            <button class="maker-tab" data-maker="yamada">
-              <span class="maker-tab-dot" style="background: #555"></span>
-              ヤマダ
-            </button>
-            <div class="maker-tab-indicator"></div>
-          </div>
+      <!-- PC用サイドバー -->
+      <aside id="sidebar" class="p-4">
+        <!-- メーカータブ -->
+        <div class="flex border-b border-gray-200 mb-4">
+          <button class="maker-tab active" data-maker="karafuruya">からふるや</button>
+          <button class="maker-tab" data-maker="yamada">ヤマダ</button>
+        </div>
 
-          <!-- スタンプ枠 -->
-          <div class="sidebar-section">
-            <div class="section-label section-label-toggle" id="stamp-section-toggle">
-              <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-                <path d="M2 4.25A2.25 2.25 0 014.25 2h11.5A2.25 2.25 0 0118 4.25v8.5A2.25 2.25 0 0115.75 15h-3.105a3.501 3.501 0 001.1 1.677A.75.75 0 0113.26 18H6.74a.75.75 0 01-.484-1.323A3.501 3.501 0 007.355 15H4.25A2.25 2.25 0 012 12.75v-8.5z"/>
-              </svg>
-              スタンプ枠
+        <!-- スタンプ一覧 -->
+        <div id="stamp-list" class="mb-4"></div>
+
+        <!-- PSD画像読み込み -->
+        <div class="mb-4">
+          <div class="section-title">PSD画像読み込み</div>
+          <input type="file" id="psd-file-input" accept=".psd" class="hidden">
+          <button id="btn-import-psd" class="action-btn w-full mb-2">
+            PSDファイルを選択...
+          </button>
+          <div id="psd-layer-list" class="space-y-2"></div>
+        </div>
+
+        <!-- 選択中の枠情報 -->
+        <div id="selected-frame-panel" class="mb-4 hidden">
+          <div class="section-title">選択中の枠</div>
+          <div class="bg-white rounded-lg border border-gray-200 p-3">
+            <div class="text-sm font-medium text-gray-700 mb-1" id="selected-frame-id">--</div>
+            <div class="text-xs text-gray-500 mb-2" id="selected-frame-size">--</div>
+            <!-- 操作状態の表示 -->
+            <div id="frame-state-indicator" class="text-xs mb-2">
+              <span class="state-select inline-block px-2 py-1 rounded text-blue-600 bg-blue-50">選択中 - もう一度タッチで移動可能</span>
+              <span class="state-move hidden inline-block px-2 py-1 rounded text-green-600 bg-green-50">移動可能</span>
             </div>
-            <div id="stamp-section-body">
-              <div id="replace-hint" class="replace-hint hidden">長押しで差し替え（PCはShift+クリック）</div>
-              <div id="stamp-list">
-                <!-- JSで動的生成 -->
-              </div>
-            </div>
+            <label class="text-xs font-medium text-gray-600 block mb-1">メモ（入稿時に表示）:</label>
+            <textarea id="memo-input"
+                      placeholder="枠ごとのメモを入力..."
+                      rows="2"
+                      class="memo-input-field w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-400 resize-none"></textarea>
           </div>
         </div>
-      </aside>
 
-      <!-- PC用: 画像配置パネル -->
-      <aside id="image-panel" class="panel-collapsible">
-        <div class="panel-collapsed-label" title="画像配置パネルを開く">画像配置</div>
-        <button class="panel-collapse-btn" data-target="image-panel" title="折りたたむ">
-          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd"/></svg>
-        </button>
-        <div class="image-panel-inner">
-          <div class="section-label">
-            <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-              <path fill-rule="evenodd" d="M1 5.25A2.25 2.25 0 013.25 3h13.5A2.25 2.25 0 0119 5.25v9.5A2.25 2.25 0 0116.75 17H3.25A2.25 2.25 0 011 14.75v-9.5zm1.5 5.81v3.69c0 .414.336.75.75.75h13.5a.75.75 0 00.75-.75v-2.69l-2.22-2.219a.75.75 0 00-1.06 0l-1.91 1.909-3.22-3.22a.75.75 0 00-1.06 0L3.5 11.06zM10 5.5a2 2 0 11-4 0 2 2 0 014 0z" clip-rule="evenodd"/>
-            </svg>
-            画像を配置
-            <span id="placer-count" class="text-[10px] text-gray-400 ml-auto"></span>
+        <!-- 整列ツール -->
+        <div class="mb-4">
+          <div class="section-title">整列ツール</div>
+          <div class="grid grid-cols-4 gap-1.5 mb-2">
+            <button class="align-btn" data-align="left" title="左揃え">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="4" x2="4" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="7" y="14" width="6" height="4" rx="1"/>
+              </svg>
+            </button>
+            <button class="align-btn" data-align="right" title="右揃え">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="20" y1="4" x2="20" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="11" y="14" width="6" height="4" rx="1"/>
+              </svg>
+            </button>
+            <button class="align-btn" data-align="top" title="上揃え">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="4" x2="20" y2="4"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="7" width="4" height="6" rx="1"/>
+              </svg>
+            </button>
+            <button class="align-btn" data-align="bottom" title="下揃え">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="20" x2="20" y2="20"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="11" width="4" height="6" rx="1"/>
+              </svg>
+            </button>
+            <button class="align-btn" data-align="centerH" title="水平中央揃え">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="2 2"/><rect x="5" y="6" width="14" height="4" rx="1"/><rect x="7" y="14" width="10" height="4" rx="1"/>
+              </svg>
+            </button>
+            <button class="align-btn" data-align="centerV" title="垂直中央揃え">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="2" y1="12" x2="22" y2="12" stroke-dasharray="2 2"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="7" width="4" height="10" rx="1"/>
+              </svg>
+            </button>
+            <button class="align-btn" data-align="distributeH" title="水平均等分布">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="4" x2="4" y2="20"/><line x1="20" y1="4" x2="20" y2="20"/><rect x="8" y="8" width="3" height="8" rx="1"/><rect x="13" y="8" width="3" height="8" rx="1"/>
+              </svg>
+            </button>
+            <button class="align-btn" data-align="distributeV" title="垂直均等分布">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="4" x2="20" y2="4"/><line x1="4" y1="20" x2="20" y2="20"/><rect x="8" y="8" width="8" height="3" rx="1"/><rect x="8" y="13" width="8" height="3" rx="1"/>
+              </svg>
+            </button>
           </div>
-          <div class="image-upload-zone" id="image-upload-zone">
-            <input type="file" id="placer-file-input" accept="image/*,.psd" multiple class="hidden">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
-            <span>画像 / PSD をアップロード</span>
-          </div>
-          <div id="placer-image-list"></div>
-          <div class="placement-hint" id="placement-hint">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd"/></svg>
-            <span>枠をクリックして画像を配置</span>
-          </div>
+        </div>
+
+        <!-- アクションボタン -->
+        <div class="space-y-2">
+          <button id="btn-delete-selected" class="action-btn danger" disabled>
+            選択を削除
+          </button>
+          <button id="btn-delete-all" class="action-btn danger">
+            全削除
+          </button>
+          <div class="border-t border-gray-200 pt-2 mt-2"></div>
+          <button id="btn-export-psd" class="action-btn primary">
+            PSD書出し (600DPI)
+          </button>
+          <button id="btn-export-png" class="action-btn">
+            PNG書出し (1200DPI)
+          </button>
+          <button id="btn-export-svg" class="action-btn">
+            SVG書出し
+          </button>
+        </div>
+
+        <div class="mt-4 text-xs text-gray-500" id="frame-count">
+          配置数: 0
         </div>
       </aside>
 
@@ -199,261 +158,80 @@
         <div id="canvas-container">
           <canvas id="main-canvas"></canvas>
         </div>
-        <!-- キャンバス上の空状態メッセージ -->
-        <div id="canvas-empty-msg" class="canvas-empty-msg">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="w-12 h-12 text-gray-300">
-            <path d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          <p class="text-sm text-gray-400 mt-2">左のパネルからスタンプ枠を追加してください</p>
-          <p class="text-xs text-gray-300 mt-1">ボタンをクリックするとここに枠が配置されます</p>
-        </div>
       </div>
-
-      <!-- 右ツールバー -->
-      <aside id="toolbar">
-        <div class="toolbar-inner">
-          <!-- 整列ツール -->
-          <div class="toolbar-section">
-            <div class="section-label">
-              <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-                <path fill-rule="evenodd" d="M2 3.75A.75.75 0 012.75 3h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 3.75zm0 4.167a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75zm0 4.166a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75zm0 4.167a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75z" clip-rule="evenodd"/>
-              </svg>
-              整列ツール
-              <span class="text-[10px] text-gray-400 ml-auto">2つ以上選択</span>
-            </div>
-            <div class="align-grid">
-              <button class="align-btn" data-align="left" title="左揃え">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="4" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="7" y="14" width="6" height="4" rx="1"/></svg>
-                <span class="align-label">左</span>
-              </button>
-              <button class="align-btn" data-align="right" title="右揃え">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="4" x2="20" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="11" y="14" width="6" height="4" rx="1"/></svg>
-                <span class="align-label">右</span>
-              </button>
-              <button class="align-btn" data-align="top" title="上揃え">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="4"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="7" width="4" height="6" rx="1"/></svg>
-                <span class="align-label">上</span>
-              </button>
-              <button class="align-btn" data-align="bottom" title="下揃え">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="20"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="11" width="4" height="6" rx="1"/></svg>
-                <span class="align-label">下</span>
-              </button>
-              <button class="align-btn" data-align="centerH" title="水平中央揃え">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="2 2"/><rect x="5" y="6" width="14" height="4" rx="1"/><rect x="7" y="14" width="10" height="4" rx="1"/></svg>
-                <span class="align-label">横中央</span>
-              </button>
-              <button class="align-btn" data-align="centerV" title="垂直中央揃え">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="12" x2="22" y2="12" stroke-dasharray="2 2"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="7" width="4" height="10" rx="1"/></svg>
-                <span class="align-label">縦中央</span>
-              </button>
-              <button class="align-btn" data-align="distributeH" title="水平均等分布">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="4" y2="20"/><line x1="20" y1="4" x2="20" y2="20"/><rect x="8" y="8" width="3" height="8" rx="1"/><rect x="13" y="8" width="3" height="8" rx="1"/></svg>
-                <span class="align-label">横均等</span>
-              </button>
-              <button class="align-btn" data-align="distributeV" title="垂直均等分布">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="4"/><line x1="4" y1="20" x2="20" y2="20"/><rect x="8" y="8" width="8" height="3" rx="1"/><rect x="8" y="13" width="8" height="3" rx="1"/></svg>
-                <span class="align-label">縦均等</span>
-              </button>
-            </div>
-            <div class="flex flex-col gap-1.5 mt-2">
-              <button id="btn-center-image" class="rotate-btn w-full" title="画像を枠の中心に移動">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
-                  <circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
-                </svg>
-                中心に移動
-              </button>
-              <button id="btn-rotate" class="rotate-btn w-full" title="選択した枠を縦横切替（ショートカット: R）">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
-                  <path d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/>
-                </svg>
-                縦横切替
-              </button>
-              <button class="auto-arrange-btn w-full" data-align="autoArrangeByOrder" title="配置順で整列：画像を配置した順に並べる">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
-                  <path d="M3 5h12M3 10h8M3 15h10"/>
-                  <path d="M19 3v14M16 14l3 3 3-3"/>
-                </svg>
-                配置順で整列
-              </button>
-              <button class="auto-arrange-btn w-full" data-align="autoArrange" title="自動整列：同じ種類を横並びにして、スペースを有効活用して配置">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
-                  <rect x="3" y="3" width="7" height="4" rx="1"/><rect x="12" y="3" width="7" height="4" rx="1"/>
-                  <rect x="3" y="9" width="5" height="4" rx="1"/><rect x="10" y="9" width="5" height="4" rx="1"/><rect x="17" y="9" width="4" height="4" rx="1"/>
-                  <rect x="3" y="15" width="9" height="4" rx="1"/><rect x="14" y="15" width="4" height="4" rx="1"/>
-                </svg>
-                自動整列
-              </button>
-            </div>
-          </div>
-
-          <!-- 複製・画像削除・メモ -->
-          <div class="toolbar-section">
-            <button id="btn-duplicate" class="rotate-btn w-full" title="選択した枠を複製">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
-                <rect x="8" y="8" width="12" height="12" rx="2"/>
-                <path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>
-              </svg>
-              複製
-            </button>
-            <button id="btn-remove-placed-image" class="rotate-btn w-full mt-1.5" style="color:#dc2626;" title="選択した枠の配置済み画像を削除（枠はそのまま残る）">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
-                <path d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-              配置画像を削除
-            </button>
-            <button id="btn-sync-memo" class="rotate-btn w-full mt-1.5" title="画像のメモを枠に反映">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
-                <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-              メモを反映
-            </button>
-            <div id="memo-edit-wrap" style="display:none; margin-top:6px;">
-              <label class="text-xs text-gray-500 font-medium" style="display:block; margin-bottom:3px;">選択枠のメモ:</label>
-              <input type="text" id="memo-edit-input" placeholder="メモを入力..."
-                style="width:100%; padding:5px 8px; font-size:12px; border:1px solid rgba(0,0,0,0.12); border-radius:6px; outline:none; background:rgba(255,255,255,0.7); font-family:'Noto Sans JP',sans-serif;">
-            </div>
-          </div>
-
-          <!-- グリッドスナップ -->
-          <div class="toolbar-section">
-            <label class="snap-toggle-label" title="ONにすると枠が5mmグリッド線に吸着します">
-              <input type="checkbox" id="snap-toggle">
-              <span class="snap-toggle-track">
-                <span class="snap-toggle-thumb"></span>
-              </span>
-              <span class="snap-toggle-text">グリッドにスナップ</span>
-            </label>
-          </div>
-
-          <!-- アクションボタン -->
-          <div class="toolbar-section">
-            <div class="action-buttons">
-              <button id="btn-delete-selected" class="action-btn glass-danger" disabled>
-                <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5z" clip-rule="evenodd"/></svg>
-                選択を削除
-              </button>
-              <button id="btn-delete-all" class="action-btn glass-danger">
-                <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/></svg>
-                全削除
-              </button>
-            </div>
-            <div class="export-buttons">
-              <button id="btn-export-png" class="action-btn glass-primary">
-                <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"/><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/></svg>
-                PNG書出し (1200DPI)
-              </button>
-              <button id="btn-export-psd" class="action-btn glass-secondary">
-                <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"/><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/></svg>
-                PSD書出し (レイヤー分け)
-              </button>
-            </div>
-            <div class="save-buttons">
-              <button id="btn-save" class="action-btn glass-save">
-                <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z"/></svg>
-                保存
-              </button>
-              <button id="btn-load" class="action-btn glass-load">
-                <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z" clip-rule="evenodd"/></svg>
-                読込
-              </button>
-            </div>
-          </div>
-
-          <!-- 配置数 -->
-          <div class="frame-counter" id="frame-count">
-            <span class="frame-counter-num">0</span>
-            <span>枠を配置中</span>
-          </div>
-        </div>
-      </aside>
     </div>
 
     <!-- ズームバー -->
-    <div id="zoom-bar">
-      <div class="zoom-bar-inner">
-        <button id="zoom-out" class="zoom-btn">
-          <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M4 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H4.75A.75.75 0 014 10z" clip-rule="evenodd"/></svg>
-        </button>
-        <div class="zoom-slider-wrap">
-          <input type="range" id="zoom-slider" min="10" max="500" value="100">
-        </div>
-        <button id="zoom-in" class="zoom-btn">
-          <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
-        </button>
-        <span id="zoom-label" class="zoom-label">100%</span>
-        <button id="zoom-fit" class="zoom-fit-btn">
-          <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path d="M4.25 2A2.25 2.25 0 002 4.25v2a.75.75 0 001.5 0v-2a.75.75 0 01.75-.75h2a.75.75 0 000-1.5h-2zM13.75 2a.75.75 0 000 1.5h2a.75.75 0 01.75.75v2a.75.75 0 001.5 0v-2A2.25 2.25 0 0015.75 2h-2zM3.5 13.75a.75.75 0 00-1.5 0v2A2.25 2.25 0 004.25 18h2a.75.75 0 000-1.5h-2a.75.75 0 01-.75-.75v-2zM18 13.75a.75.75 0 00-1.5 0v2a.75.75 0 01-.75.75h-2a.75.75 0 000 1.5h2A2.25 2.25 0 0018 15.75v-2z"/></svg>
-          フィット
-        </button>
-      </div>
+    <div id="zoom-bar" class="px-4 py-2 flex items-center gap-3">
+      <button id="zoom-out" class="text-gray-500 hover:text-gray-700 font-bold text-lg leading-none px-1">-</button>
+      <input type="range" id="zoom-slider" min="10" max="500" value="100" class="flex-1">
+      <button id="zoom-in" class="text-gray-500 hover:text-gray-700 font-bold text-lg leading-none px-1">+</button>
+      <span id="zoom-label" class="text-sm text-gray-600 w-12 text-right">100%</span>
+      <button id="zoom-fit" class="text-xs text-blue-600 hover:text-blue-800 ml-2">フィット</button>
     </div>
 
     <!-- モバイル用下部パネル -->
     <div id="mobile-panel" class="collapsed">
-      <div id="mobile-panel-handle">
-        <div class="mobile-handle-bar"></div>
-        <span class="mobile-handle-label">スタンプ枠を選択</span>
-      </div>
+      <div id="mobile-panel-handle"></div>
       <div id="mobile-panel-content">
-        <div class="flex border-b border-gray-200/50 mb-3">
-          <button class="maker-tab active" data-maker="karafuruya">からふる屋</button>
+        <div class="flex border-b border-gray-200 mb-3">
+          <button class="maker-tab active" data-maker="karafuruya">からふるや</button>
           <button class="maker-tab" data-maker="yamada">ヤマダ</button>
         </div>
         <div id="mobile-stamp-list" class="mb-3"></div>
-        <!-- モバイル: 画像配置 -->
-        <div class="mb-3">
-          <div class="flex items-center gap-2 mb-1.5">
-            <span class="text-xs font-semibold text-gray-500">画像を配置</span>
-            <span id="mobile-placer-count" class="text-[10px] text-gray-400"></span>
-            <button id="mobile-image-upload-btn" class="ml-auto text-xs font-semibold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md">画像追加</button>
+        <button id="mobile-btn-import-psd" class="action-btn w-full mb-2">PSD読み込み</button>
+        <div id="mobile-psd-layer-list" class="mb-3"></div>
+        <!-- 選択中の枠メモ（モバイル） -->
+        <div id="mobile-selected-panel" class="mb-3 hidden">
+          <div class="text-xs font-medium text-gray-600 mb-1">
+            <span id="mobile-frame-id">--</span> メモ:
           </div>
-          <div id="mobile-placer-image-list"></div>
-          <div class="placement-hint" id="mobile-placement-hint">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd"/></svg>
-            <span>枠をクリックして配置</span>
-          </div>
+          <textarea id="mobile-memo-input"
+                    placeholder="メモ..."
+                    rows="2"
+                    class="memo-input-field w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-400 resize-none"></textarea>
         </div>
-        <div class="flex items-center gap-1.5 mb-3 flex-wrap">
-          <button class="align-btn-sm" data-align="left" title="左揃え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="4" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="7" y="14" width="6" height="4" rx="1"/></svg></button>
-          <button class="align-btn-sm" data-align="right" title="右揃え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="4" x2="20" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="11" y="14" width="6" height="4" rx="1"/></svg></button>
-          <button class="align-btn-sm" data-align="top" title="上揃え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="4"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="7" width="4" height="6" rx="1"/></svg></button>
-          <button class="align-btn-sm" data-align="bottom" title="下揃え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="20"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="11" width="4" height="6" rx="1"/></svg></button>
-          <button class="align-btn-sm" data-align="centerH" title="横中央"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="2 2"/><rect x="5" y="6" width="14" height="4" rx="1"/><rect x="7" y="14" width="10" height="4" rx="1"/></svg></button>
-          <button class="align-btn-sm" data-align="centerV" title="縦中央"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="12" x2="22" y2="12" stroke-dasharray="2 2"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="7" width="4" height="10" rx="1"/></svg></button>
-          <button class="align-btn-sm" data-align="distributeH" title="横均等"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="4" y2="20"/><line x1="20" y1="4" x2="20" y2="20"/><rect x="8" y="8" width="3" height="8" rx="1"/><rect x="13" y="8" width="3" height="8" rx="1"/></svg></button>
-          <button class="align-btn-sm" data-align="distributeV" title="縦均等"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="4"/><line x1="4" y1="20" x2="20" y2="20"/><rect x="8" y="8" width="8" height="3" rx="1"/><rect x="8" y="13" width="8" height="3" rx="1"/></svg></button>
-          <button id="mobile-btn-center" class="rotate-btn-sm" title="画像を中心に">中心</button>
-          <button id="mobile-btn-rotate" class="rotate-btn-sm" title="縦横切替">縦横</button>
-          <button class="auto-arrange-btn-sm" data-align="autoArrangeByOrder" title="配置順で整列">配置順</button>
-          <button class="auto-arrange-btn-sm" data-align="autoArrange" title="自動整列">自動整列</button>
-        </div>
-        <div class="flex gap-2 mb-2">
-          <button class="undo-redo-btn flex-1" data-action="undo" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h10a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5H8M3 10l4-4M3 10l4 4"/></svg>
-            戻す
+        <div class="flex items-center gap-2 mb-3 flex-wrap">
+          <button class="align-btn" data-align="left" title="左揃え">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="4" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="7" y="14" width="6" height="4" rx="1"/></svg>
           </button>
-          <button class="undo-redo-btn flex-1" data-action="redo" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10H11a5 5 0 0 0-5 5v0a5 5 0 0 0 5 5h5M21 10l-4-4M21 10l-4 4"/></svg>
-            やり直す
+          <button class="align-btn" data-align="right" title="右揃え">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="4" x2="20" y2="20"/><rect x="7" y="6" width="10" height="4" rx="1"/><rect x="11" y="14" width="6" height="4" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="top" title="上揃え">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="4"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="7" width="4" height="6" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="bottom" title="下揃え">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="20"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="11" width="4" height="6" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="centerH" title="水平中央">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="2 2"/><rect x="5" y="6" width="14" height="4" rx="1"/><rect x="7" y="14" width="10" height="4" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="centerV" title="垂直中央">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="12" x2="22" y2="12" stroke-dasharray="2 2"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="7" width="4" height="10" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="distributeH" title="水平均等">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="4" y2="20"/><line x1="20" y1="4" x2="20" y2="20"/><rect x="8" y="8" width="3" height="8" rx="1"/><rect x="13" y="8" width="3" height="8" rx="1"/></svg>
+          </button>
+          <button class="align-btn" data-align="distributeV" title="垂直均等">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="4"/><line x1="4" y1="20" x2="20" y2="20"/><rect x="8" y="8" width="8" height="3" rx="1"/><rect x="8" y="13" width="8" height="3" rx="1"/></svg>
           </button>
         </div>
         <div class="flex gap-2">
-          <button id="mobile-btn-delete" class="action-btn glass-danger flex-1" disabled>削除</button>
-          <button id="mobile-btn-clear" class="action-btn glass-danger flex-1">全削除</button>
-          <button id="mobile-btn-export" class="action-btn glass-primary flex-1">PNG書出し</button>
-          <button id="mobile-btn-export-psd" class="action-btn glass-secondary flex-1">PSD</button>
+          <button id="mobile-btn-delete" class="action-btn danger flex-1" disabled>削除</button>
+          <button id="mobile-btn-clear" class="action-btn danger flex-1">全削除</button>
+          <button id="mobile-btn-export" class="action-btn primary flex-1">PSD書出し</button>
         </div>
       </div>
     </div>
 
     <!-- ローディングオーバーレイ -->
     <div id="loading-overlay">
-      <div class="loading-card">
-        <div class="loading-spinner"></div>
-        <p id="loading-text">エクスポート中...</p>
+      <div class="text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p class="text-gray-600" id="loading-text">エクスポート中...</p>
       </div>
     </div>
-
   </div>
 
   <!-- JavaScript -->
@@ -461,11 +239,8 @@
   <script src="js/canvas-manager.js"></script>
   <script src="js/frame-factory.js"></script>
   <script src="js/snap-align.js"></script>
+  <script src="js/psd-handler.js"></script>
   <script src="js/exporter.js"></script>
-  <script src="js/image-placer.js"></script>
-  <script src="js/history-manager.js"></script>
-  <script src="js/storage-manager.js"></script>
-  <script src="js/sheet-fetcher.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
