@@ -92,6 +92,8 @@
           noiseSize: 5,
           applied: false, // 変更適用済みフラグ
           memo: '',  // メモ（入稿ツールに転送される）
+          undoStack: [],  // アンドゥ用スナップショット
+          redoStack: [],  // リドゥ用スナップショット
         };
 
         _applyBinarize(imageObj);
@@ -347,6 +349,12 @@
     if (barPen) barPen.classList.toggle('active', !!img.penActive);
     if (barEraser) barEraser.classList.toggle('active', !!img.eraserActive);
     if (barLasso) barLasso.classList.toggle('active', !!img.lassoActive);
+
+    // アンドゥ/リドゥボタン状態
+    const undoBtn = document.getElementById('bar-undo-btn');
+    const redoBtn = document.getElementById('bar-redo-btn');
+    if (undoBtn) undoBtn.disabled = img.undoStack.length === 0;
+    if (redoBtn) redoBtn.disabled = img.redoStack.length === 0;
   }
 
   // === 下部バースライダーイベント ===
@@ -393,7 +401,63 @@
       const img = images.find(i => i.id === selectedImageId);
       if (img) { _activateTool(img, 'lasso'); _syncBottomBar(); }
     });
+
+    // アンドゥ/リドゥボタン
+    document.getElementById('bar-undo-btn').addEventListener('click', () => _undo());
+    document.getElementById('bar-redo-btn').addEventListener('click', () => _redo());
   }
+
+  // === アンドゥ/リドゥ ===
+  function _saveUndoState(imageObj) {
+    const canvas = imageObj.previewCanvas;
+    const ctx = canvas.getContext('2d');
+    imageObj.undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    // 上限30ステップ
+    if (imageObj.undoStack.length > 30) imageObj.undoStack.shift();
+    // 新しい操作でredoスタックをクリア
+    imageObj.redoStack = [];
+    _syncBottomBar();
+  }
+
+  function _undo() {
+    const img = images.find(i => i.id === selectedImageId);
+    if (!img || img.undoStack.length === 0) return;
+    const canvas = img.previewCanvas;
+    const ctx = canvas.getContext('2d');
+    // 現在の状態をredoに保存
+    img.redoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    // undoスタックから復元
+    ctx.putImageData(img.undoStack.pop(), 0, 0);
+    _syncBottomBar();
+  }
+
+  function _redo() {
+    const img = images.find(i => i.id === selectedImageId);
+    if (!img || img.redoStack.length === 0) return;
+    const canvas = img.previewCanvas;
+    const ctx = canvas.getContext('2d');
+    // 現在の状態をundoに保存
+    img.undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    // redoスタックから復元
+    ctx.putImageData(img.redoStack.pop(), 0, 0);
+    _syncBottomBar();
+  }
+
+  // キーボードショートカット
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+      if (e.shiftKey) {
+        e.preventDefault();
+        _redo();
+      } else {
+        e.preventDefault();
+        _undo();
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+      e.preventDefault();
+      _redo();
+    }
+  });
 
   // === 太さインジケーター表示 ===
   function _showSizeIndicator(imageObj) {
@@ -531,6 +595,7 @@
 
     function _startDraw(e) {
       if (imageObj.lassoActive) {
+        _saveUndoState(imageObj); // 投げ縄開始前に保存
         isDrawing = true;
         lassoPoints = [];
         const pos = _getCanvasPos(e);
@@ -542,6 +607,7 @@
       }
 
       if (!imageObj.penActive && !imageObj.eraserActive) return;
+      _saveUndoState(imageObj); // ペン/消しゴム描画開始前に保存
       isDrawing = true;
       _draw(e);
     }
